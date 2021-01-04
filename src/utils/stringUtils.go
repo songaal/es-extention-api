@@ -23,3 +23,15 @@ func GetArg(key, defaultValue string, arguments []string) (val string) {
 	}
 	return
 }
+
+func Contains(s []string, e string) bool {
+	if s == nil {
+		return true
+	}
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
