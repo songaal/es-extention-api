@@ -1,11 +1,12 @@
 # 엘라스틱서치 확장 API 
 
-엘라스틱서치에 검색을 통해 Left조인 기능을 추가하였습니다.
+## 소개
 
+엘라스틱서치의 Left Join 기능을 제공합니다.
 
-엘라스틱과 키바나 사이에 es-extention-api 연결하게 되면 /<인덱스명>/_left 엔드포인트가 활성화됩니다.    
+es-extention-api를 통해 엘라스틱서치 연결을 하면 /_left 엔드포인트를 사용할 수 있게 됩니다.    
 
-join 필드를 포함하여 검색 요청을 보내면 innerHits에 _child를 포함한 결과를 받을 수 있습니다.
+_search 유사하게 조인 QueryDSL를 작성하게 되면 innerHits에 _child를 포함한 결과를 받을 수 있습니다.
 
 ```
 GET /parent-index/_left
@@ -49,6 +50,7 @@ OUTPUT
         "_source": {
           "priceType": "",
           "discontinued": "N",
+          ...(중략)
         },
         "inner_hits": {
           "_child": {
@@ -69,6 +71,7 @@ OUTPUT
                   "_source": {
                     "popularityScore": "0",
                     "shareCate3": "0"
+                    ...(중략)
                   }
                 }
               ]
@@ -102,10 +105,11 @@ OUTPUT
 
 
 ### 실행 명령어
- 
+아래 명령어로 서버를 실행하 후 curl localhost:9000/_cat/nodes 요청시 정상적으로 ES 결과를 받는지 확인합니다. 
  ```
 ./application port=9000 es.urls=http://elasticsearch:9200 es.user=elastic es.password=z1p87tXaR8gggSqPh8x 
 ```
+
 
 
 
