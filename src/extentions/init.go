@@ -19,6 +19,7 @@ var (
 func Initialize() {
 	log.Println("init.")
 	tmpEsClient, err := elastic.NewClient(
+		elastic.SetBasicAuth(EsUser, EsPassword),
 		elastic.SetURL(EsTargetList...),
 		elastic.SetGzip(false),
 		elastic.SetSniff(false),
