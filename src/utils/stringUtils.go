@@ -35,3 +35,18 @@ func Contains(s []string, e string) bool {
 	}
 	return false
 }
+
+func TypeOf(v interface{}) string {
+	switch v.(type) {
+	case int:
+		return "int"
+	case float64:
+		return "float64"
+	case []interface{}:
+		return "list"
+	case map[string]interface{}:
+		return "object"
+	default:
+		return "unknown"
+	}
+}

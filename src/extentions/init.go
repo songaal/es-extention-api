@@ -1,6 +1,7 @@
 package extentions
 
 import (
+	"fmt"
 	"github.com/danawalab/es-extention-api/src/utils"
 	"github.com/olivere/elastic/v7"
 	"log"
@@ -10,6 +11,7 @@ import (
 )
 
 var (
+	GoEnv          = utils.GetArg("go.env", "development", os.Args)
 	EsTargetList = strings.Split(utils.GetArg("es.urls", "http://elasticsearch:9200", os.Args), ",")
 	EsUser       = utils.GetArg("es.user", "", os.Args)
 	EsPassword   = utils.GetArg("es.password", "", os.Args)
@@ -19,15 +21,18 @@ var (
 func Initialize() {
 	log.Println("init.")
 	tmpEsClient, err := elastic.NewClient(
-		elastic.SetBasicAuth(EsUser, EsPassword),
 		elastic.SetURL(EsTargetList...),
-		elastic.SetGzip(false),
-		elastic.SetSniff(false),
+		elastic.SetBasicAuth(EsUser, EsPassword),
 		elastic.SetHealthcheckInterval(10*time.Second),
-		elastic.SetMaxRetries(3))
-		//elastic.SetTraceLog(log.New(os.Stdout, "TRACE ", log.Ltime|log.Lshortfile)))
+		elastic.SetMaxRetries(3),
+		elastic.SetGzip(true),
+		elastic.SetSniff(false),
+		elastic.SetTraceLog(log.New(os.Stdout, "", log.Ltime|log.Lshortfile)),
+		)
+
 	if err != nil {
 		log.Println("ES Connection ERROR", err)
+		panic("ES Connection ERROR" + fmt.Sprintln(err))
 	} else {
 		EsClient = *tmpEsClient
 	}
