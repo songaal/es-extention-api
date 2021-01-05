@@ -30,7 +30,6 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	// Parent 인덱스 조회
 	vars := mux.Vars(req)
 	indices := vars["indices"]
-	log.Println("indices: ", indices)
 
 	var leftRequest map[string]interface{}
 
@@ -60,7 +59,6 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	parentResult, err := EsClient.Search().
 		Index(indices).
 		Timeout("60s").
-		Pretty(true).
 		Source(leftRequest).
 		Do(context.TODO())
 	if err != nil {
@@ -105,22 +103,18 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		boolQuery["bool"] = mustQuery
 		childQuery["query"] = boolQuery
 
-		jsonString, _ := json.Marshal(&childQuery)
-		fmt.Println(jsonString)
-
 		childResult, err := EsClient.Search().
 			Index(leftJoin.Index).
 			Timeout("60s").
 			Source(childQuery).
-			Pretty(true).
-			TrackTotalHits(true).
+			From(0).
+			Size(10000).
 			Do(context.TODO())
 		if err != nil {
 			res.WriteHeader(400)
 			res.Write([]byte("{\"error\": \"" + err.Error() + "\"}"))
 			return
 		}
-
 
 		// 결과 조합
 		for _, parent := range parentResult.Hits.Hits {
@@ -141,7 +135,6 @@ func Left(res http.ResponseWriter, req *http.Request) {
 				childSource := make(map[string]interface{}, 0)
 				json.Unmarshal(child.Source, &childSource)
 
-				log.Println(leftJoin.Parent, parentSource[leftJoin.Parent], childSource[leftJoin.Child], leftJoin.Child)
 				if parentSource[leftJoin.Parent] == nil || childSource[leftJoin.Child] == nil {
 					continue
 				}

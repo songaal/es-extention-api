@@ -24,8 +24,8 @@ func Initialize() {
 		elastic.SetGzip(false),
 		elastic.SetSniff(false),
 		elastic.SetHealthcheckInterval(10*time.Second),
-		elastic.SetMaxRetries(3),
-		elastic.SetTraceLog(log.New(os.Stdout, "TRACE ", log.Ltime|log.Lshortfile)))
+		elastic.SetMaxRetries(3))
+		//elastic.SetTraceLog(log.New(os.Stdout, "TRACE ", log.Ltime|log.Lshortfile)))
 	if err != nil {
 		log.Println("ES Connection ERROR", err)
 	} else {
