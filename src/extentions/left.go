@@ -52,7 +52,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	// 데이터 검증
 	if len(leftJoin.Parent) == 0 || len(leftJoin.Child) == 0 {
 		res.WriteHeader(400)
-		res.Write([]byte("{\"usage\": \" GET /parent-index/_left\n{\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"term\": {\n            \"pk.keyword\": {\n              \"value\": \"PK_00003\"\n            }\n          }\n        }\n      ]\n    }\n  },\n  \"join\": {\n    \"index\": \"child-index\",\n    \"parent\": \"parent-field\",\n    \"child\": \"child-field\",\n    \"query\": {\n      \"bool\": {\n        \"must\": [\n          {\n            \"term\": {\n              \"ref.keyword\": {\n                \"value\": \"REF_00003\"\n              }\n            }\n          }\n        ]\n      }\n    }\n  }\n}\"}"))
+		res.Write([]byte("{\n\"usage\":  \nGET /parent-index/_left\n{\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"term\": {\n            \"pk\": {\n              \"value\": \"PK_00003\"\n            }\n          }\n        }\n      ]\n    }\n  },\n  \"join\": {\n    \"index\": \"child-index\",\n    \"parent\": \"parent-field\",\n    \"child\": \"child-field\",\n    \"query\": {\n      \"bool\": {\n        \"must\": [\n          {\n            \"term\": {\n              \"ref.keyword\": {\n                \"value\": \"REF_00003\"\n              }\n            }\n          }\n        ]\n      }\n    }\n  }\n}\n}"))
 		return
 	}
 
