@@ -31,7 +31,7 @@ func main() {
 	// 라우팅
 	router := mux.NewRouter()
 	router.HandleFunc("/{indices:[a-zA-Z0-9-_.,*]+}/_left", extentions.Left)
-	router.HandleFunc("/", extentions.Default)
+	router.HandleFunc("/{uri:.*}", extentions.Default)
 
 	// listen..
 	listen := fmt.Sprintf("%s:%s", serverAddr, serverPort)

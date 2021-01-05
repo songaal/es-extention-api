@@ -18,14 +18,13 @@ var (
 
 func Initialize() {
 	log.Println("init.")
-
 	tmpEsClient, err := elastic.NewClient(
 		elastic.SetURL(EsTargetList...),
-		elastic.SetGzip(true),
+		elastic.SetGzip(false),
 		elastic.SetSniff(false),
 		elastic.SetHealthcheckInterval(10*time.Second),
 		elastic.SetMaxRetries(3),
-		elastic.SetTraceLog(log.New(os.Stdout, "", 0)))
+		elastic.SetTraceLog(log.New(os.Stdout, "TRACE ", log.Ltime|log.Lshortfile)))
 	if err != nil {
 		log.Println("ES Connection ERROR", err)
 	} else {

@@ -8,6 +8,7 @@ import (
 	"github.com/danawalab/es-extention-api/src/utils"
 	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
+	"github.com/olivere/elastic/v7"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -48,10 +49,18 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	mapstructure.Decode(leftRequest[JoinField], &leftJoin)
 	delete(leftRequest, JoinField)
 
+	// 데이터 검증
+	if len(leftJoin.Parent) == 0 || len(leftJoin.Child) == 0 {
+		res.WriteHeader(400)
+		res.Write([]byte("{\"usage\": \" GET /parent-index/_left\n{\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"term\": {\n            \"pk.keyword\": {\n              \"value\": \"PK_00003\"\n            }\n          }\n        }\n      ]\n    }\n  },\n  \"join\": {\n    \"index\": \"child-index\",\n    \"parent\": \"parent-field\",\n    \"child\": \"child-field\",\n    \"query\": {\n      \"bool\": {\n        \"must\": [\n          {\n            \"term\": {\n              \"ref.keyword\": {\n                \"value\": \"REF_00003\"\n              }\n            }\n          }\n        ]\n      }\n    }\n  }\n}\"}"))
+		return
+	}
+
 	// Parent 엘라스틱 서치 조회
 	parentResult, err := EsClient.Search().
 		Index(indices).
 		Timeout("60s").
+		Pretty(true).
 		Source(leftRequest).
 		Do(context.TODO())
 	if err != nil {
@@ -65,20 +74,17 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	for _, element := range parentResult.Hits.Hits {
 		tmpSource := make(map[string]interface{}, 0)
 		json.Unmarshal(element.Source, &tmpSource)
-		val := fmt.Sprint(tmpSource[leftJoin.Parent])
-
-		if len(val) > 0 && utils.Contains(list, val) {
-			list = append(list, val)
+		if tmpSource[leftJoin.Parent] != nil {
+			parentKey := leftJoin.Parent
+			val := fmt.Sprint(tmpSource[parentKey])
+			if utils.Contains(list, val) == false {
+				list = append(list, val)
+			}
 		}
 	}
 
-	if len(list) == 0 {
-		// 매핑 값으면 로직 완료.
-		pb, _ := json.Marshal(parentResult)
-		res.Write(pb)
-		return
-	} else {
-
+	if len(list) > 0 {
+		// child 쿼리 ES 조회
 		childQuery := make(map[string]interface{}, 1)
 		boolQuery := make(map[string]interface{}, 1)
 		mustQuery := make(map[string]interface{}, 1)
@@ -96,14 +102,17 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			must = append(must, leftJoin.Query)
 		}
 		mustQuery["must"] = must
-
 		boolQuery["bool"] = mustQuery
 		childQuery["query"] = boolQuery
+
+		jsonString, _ := json.Marshal(&childQuery)
+		fmt.Println(jsonString)
 
 		childResult, err := EsClient.Search().
 			Index(leftJoin.Index).
 			Timeout("60s").
 			Source(childQuery).
+			Pretty(true).
 			TrackTotalHits(true).
 			Do(context.TODO())
 		if err != nil {
@@ -112,23 +121,56 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		//SearchHit := parentResult.Hits.Hits
 
+		// 결과 조합
+		for _, parent := range parentResult.Hits.Hits {
+			parentSource := make(map[string]interface{}, 0)
+			json.Unmarshal(parent.Source, &parentSource)
 
-		log.Println(parentResult, childResult)
-		//totalHits := int(parentResult.Hits.TotalHits.Value)
+			var searchHitInnerHits elastic.SearchHitInnerHits
+			var searchHits elastic.SearchHits
+			var searchHit []*elastic.SearchHit
+			var totalHits elastic.TotalHits
+			var maxScore float64
 
+			maxScore = 0.0
+			totalHits.Value = 0
+			totalHits.Relation = "eq"
 
+			for _, child := range childResult.Hits.Hits {
+				childSource := make(map[string]interface{}, 0)
+				json.Unmarshal(child.Source, &childSource)
+
+				log.Println(leftJoin.Parent, parentSource[leftJoin.Parent], childSource[leftJoin.Child], leftJoin.Child)
+				if parentSource[leftJoin.Parent] == nil || childSource[leftJoin.Child] == nil {
+					continue
+				}
+				if parentSource[leftJoin.Parent] == childSource[leftJoin.Child] {
+
+					if maxScore < *child.Score {
+						maxScore = *child.Score
+					}
+					searchHit = append(searchHit, &*child)
+					totalHits.Value += 1
+					totalHits.Relation = "eq"
+				}
+			}
+
+			searchHits.TotalHits = &totalHits
+			searchHits.MaxScore = &maxScore
+			searchHits.Hits = searchHit
+
+			searchHitInnerHits.Hits = &searchHits
+			if parent.InnerHits == nil {
+				innerHits := make(map[string]*elastic.SearchHitInnerHits, 0)
+				parent.InnerHits = innerHits
+			}
+			parent.InnerHits["_child"] = &searchHitInnerHits
+		}
 	}
 
-}
-
-
-
-func printQueryDsl(src interface{}) {
-	data, err := json.MarshalIndent(src, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(data))
+	response, _ := json.MarshalIndent(parentResult, "", "  ")
+	res.WriteHeader(200)
+	res.Write(response)
+	return
 }

@@ -26,7 +26,7 @@ func GetArg(key, defaultValue string, arguments []string) (val string) {
 
 func Contains(s []string, e string) bool {
 	if s == nil {
-		return true
+		return false
 	}
 	for _, a := range s {
 		if a == e {
