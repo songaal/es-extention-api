@@ -9,7 +9,9 @@ import (
 
 var defaultRoundRobinSequence = 0
 func Default(res http.ResponseWriter, req *http.Request) {
-	log.Println("proxy : ", req.RequestURI)
+	if GoEnv != "production" {
+		log.Println("proxy : ", req.RequestURI)
+	}
 	esTarget, _ := url.Parse(EsTargetList[defaultRoundRobinSequence])
 	if defaultRoundRobinSequence < len(EsTargetList) - 1 {
 		defaultRoundRobinSequence += 1

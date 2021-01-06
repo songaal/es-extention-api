@@ -31,6 +31,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 	}()
 
+	reqJson, _ := json.Marshal(req)
+	log.Println("left : " + string(reqJson))
+
+
 	// Parent 인덱스 조회
 	vars := mux.Vars(req)
 	indices := vars["indices"]

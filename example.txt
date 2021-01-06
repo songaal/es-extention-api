@@ -1,0 +1,113 @@
+DELETE /parent-index
+DELETE /child-index
+
+PUT /parent-index
+{
+  "mappings": {
+    "properties": {
+      "pk": {
+        "type": "keyword"
+      },
+      "ref": {
+        "type": "keyword"
+      },
+      "product_name": {
+        "type": "text"
+      }
+    }
+  }
+}
+PUT /child-index
+{
+  "mappings": {
+    "properties": {
+      "ref": {
+        "type": "keyword"
+      },
+      "category": {
+        "type": "keyword"
+      }
+    }
+  }
+}
+
+POST /parent-index/_doc
+{
+  "ref": "REF_00001",
+  "pk": "PK_00001",
+  "product_name": "삼성 노트북"
+}
+POST /parent-index/_doc
+{
+  "ref": "REF_00001",
+  "pk": "PK_00002",
+  "product_name": "LG 노트북"
+}
+POST /parent-index/_doc
+{
+  "ref": "REF_00001",
+  "pk": "PK_00003",
+  "product_name": "Asus 노트북"
+}
+POST /parent-index/_doc
+{
+  "ref": "REF_00002",
+  "pk": "PK_00004",
+  "product_name": "삼성모니터"
+}
+POST /parent-index/_doc
+{
+  "ref": "REF_00002",
+  "pk": "PK_00004",
+  "product_name": "LG모니터"
+}
+POST /parent-index/_doc
+{
+  "ref": "REF_00002",
+  "pk": "PK_00005",
+  "product_name": "ViewSonic 모니터"
+}
+
+POST /child-index/_doc
+{
+  "ref": "REF_00001",
+  "category": "노트북"
+}
+POST /child-index/_doc
+{
+  "ref": "REF_00002",
+  "category": "모니터"
+}
+
+
+GET parent-index/_search
+{}
+
+
+GET /parent-index/_left?pretty
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "term": {
+            "product_name": {
+              "value": "노트북"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "size": 30,
+  "join": {
+    "index": "child-index",
+    "parent": "ref",
+    "child": "ref",
+    "query": {
+      "match": {
+        "category": "노트북"
+      }
+    }
+  }
+}
