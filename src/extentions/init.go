@@ -20,6 +20,7 @@ var (
 
 func Initialize() {
 	log.Println("init.")
+	log.Println("es list:", EsTargetList)
 	tmpEsClient, err := elastic.NewClient(
 		elastic.SetURL(EsTargetList...),
 		elastic.SetBasicAuth(EsUser, EsPassword),

@@ -42,9 +42,15 @@ func TypeOf(v interface{}) string {
 		return "int"
 	case float64:
 		return "float64"
+	case string:
+		return "string"
 	case []interface{}:
 		return "list"
+	case []string:
+		return "list"
 	case map[string]interface{}:
+		return "object"
+	case interface{}:
 		return "object"
 	default:
 		return "unknown"

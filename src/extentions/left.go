@@ -1,6 +1,7 @@
 package extentions
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 const (
@@ -28,12 +28,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			res.WriteHeader(400)
 			res.Write([]byte("{\"error\": " + fmt.Sprintln(v) + "}"))
 		}
-
 	}()
 
 	reqJson, _ := json.Marshal(req)
 	log.Println("left : " + string(reqJson))
-
 
 	// Parent 인덱스 조회
 	vars := mux.Vars(req)
@@ -47,22 +45,42 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	err := json.Unmarshal(read, &leftRequest)
 	if err != nil {
 		res.WriteHeader(400)
-		res.Write([]byte("{\"error\": \"" + err.Error() + "\"}"))
+		_, _ = res.Write([]byte("{\"error\": \"" + err.Error() + "\"}"))
 		return
 	}
 
 	// Join 필드 추출.
 	var leftJoinList []model.LeftJoin
 	if utils.TypeOf(leftRequest[JoinField]) == "list" {
-		mapstructure.Decode(leftRequest[JoinField], &leftJoinList)
+		// join 여러개
+		_ = mapstructure.Decode(leftRequest[JoinField], &leftJoinList)
+
 	} else if utils.TypeOf(leftRequest[JoinField]) == "object" {
+		// parent, child 필드 추출
+		tmpLeftJoinMap := make(map[string]interface{}, 0)
+		_ = mapstructure.Decode(leftRequest[JoinField], &tmpLeftJoinMap)
+		tmpParentList := make([]string, 0)
+		tmpChildList := make([]string, 0)
+		if utils.TypeOf(tmpLeftJoinMap["parent"]) == "list" && utils.TypeOf(tmpLeftJoinMap["child"]) == "list" {
+			_ = mapstructure.Decode(tmpLeftJoinMap["parent"], &tmpParentList)
+			_ = mapstructure.Decode(tmpLeftJoinMap["child"], &tmpChildList)
+		} else if utils.TypeOf(tmpLeftJoinMap["parent"]) == "string" && utils.TypeOf(tmpLeftJoinMap["child"]) == "string"{
+			tmpParentList = append(tmpParentList, fmt.Sprintf("%v", tmpLeftJoinMap["parent"]))
+			tmpChildList = append(tmpChildList, fmt.Sprintf("%v", tmpLeftJoinMap["child"]))
+		} else {
+			panic("Invalid parent and child values. USAGE: " + usage)
+			return
+		}
+
 		// Child Left Join 필드 추출
 		leftJoin := model.LeftJoin{}
-		mapstructure.Decode(leftRequest[JoinField], &leftJoin)
+		_ = mapstructure.Decode(leftRequest[JoinField], &leftJoin)
+		leftJoin.Parent = tmpParentList
+		leftJoin.Child = tmpChildList
 		leftJoinList = append(leftJoinList, leftJoin)
 	}
 
-	// child 쿼리는 제거.
+	// 메인 쿼리에서 join 필드 제거.
 	delete(leftRequest, JoinField)
 	parentQuery := leftRequest
 
@@ -90,142 +108,170 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// parent 매핑 값 추출. (중복 제거)
-	var list [][]string
+	// filed seq: [val1, val2, val3 ....]
+	leftJoinOnWhere := make([]map[string][]string, len(leftJoinList))
+	// Parent 조회
 	for _, parentElement := range parentResult.Hits.Hits {
 		tmpSource := make(map[string]interface{}, 0)
-		json.Unmarshal(parentElement.Source, &tmpSource)
-		for i, childElement := range leftJoinList {
-			parentKey := childElement.Parent
-			childKey := childElement.Child
-			val := fmt.Sprint(tmpSource[parentKey])
+		_ = json.Unmarshal(parentElement.Source, &tmpSource)
 
-			if len(list) <= i {
-				list = append(list, []string{})
-			}
-
+		for index, childElement := range leftJoinList {
 			// child index 존재 확인.
 			existsIndices(childElement.Index)
 
-			// 데이터 검증
+			parentKey := childElement.Parent
+			childKey := childElement.Child
+
 			if len(parentKey) == 0 || len(childKey) == 0 {
-				log.Println("invalid key. parentKey: ", parentKey, ", childKey: ", childKey)
-				panic(usage)
+				panic("There is at least 1 parent key and child key.")
+				return
+			} else if len(parentKey) != len(childKey) {
+				panic("The number of parent and child keys does not match.")
 				return
 			}
 
-			// list에 각각 관계 값 적재함.
-			if tmpSource[parentKey] != nil && utils.Contains(list[i], val) == false {
-				list[i] = append(list[i], val)
+			for pi, k := range parentKey {
+				strParentKey := fmt.Sprintf("%v", k)
+				if len(strParentKey) == 0 {
+					// invalid usage
+					panic("The parent key cannot be empty.")
+					return
+				}
+				// parent key 순서와 child key 순서에 맞게 매칭함.
+				strChildKey := fmt.Sprintf("%v", childKey[pi])
+				if len(strChildKey) == 0 {
+					panic("The child key cannot be empty.")
+					return
+				}
+				//parent 값을 적재. child 검색 쿼리로 조합 목적
+				parentRefValue := fmt.Sprint(tmpSource[strParentKey])
+				if leftJoinOnWhere[index] == nil {
+					leftJoinOnWhere[index] = map[string][]string{}
+				}
+
+				if utils.Contains(leftJoinOnWhere[index][strChildKey], parentRefValue) == false {
+					leftJoinOnWhere[index][strChildKey] = append(leftJoinOnWhere[index][strChildKey], parentRefValue)
+				}
 			}
 		}
 	}
-	if len(list) > 0 {
+	log.Println("", leftJoinOnWhere)
 
-		for index, childElement := range leftJoinList {
-			// child 쿼리 ES 조회
-			childQuery := make(map[string]interface{}, 1)
-			boolQuery := make(map[string]interface{}, 1)
-			mustQuery := make(map[string]interface{}, 1)
-			var must []interface{}
+	for index, childElement := range leftJoinList {
+		childFrom := 0
+		childSize := 10000
+		if childElement.From > 0 {
+			childFrom = childElement.From
+		}
+		if childElement.Size > 0 {
+			childSize = childElement.Size
+		}
+
+		// child 쿼리 ES 조회
+		childQuery := make(map[string]interface{}, 1)
+		boolQuery := make(map[string]interface{}, 1)
+		mustQuery := make(map[string]interface{}, 1)
+		var must []interface{}
+
+		for _, childKey := range childElement.Child {
 			termsQuery := make(map[string]interface{}, 1)
-
 			terms := make(map[string]interface{}, 1)
-			terms[childElement.Child] = list[index]
+			terms[childKey] = leftJoinOnWhere[index][childKey]
 			termsQuery["terms"] = terms
 			must = append(must, termsQuery)
+		}
 
-			if len(childElement.Query) > 0 {
-				// 커스텀 쿼리가 있을 경우
-				must = append(must, childElement.Query)
+		if len(childElement.Query) > 0 {
+			// 커스텀 쿼리가 있을 경우
+			must = append(must, childElement.Query)
+		}
+
+		mustQuery["must"] = must
+		boolQuery["bool"] = mustQuery
+		childQuery["query"] = boolQuery
+
+		printJson, _ := json.Marshal(childQuery)
+		log.Println(string(printJson))
+
+		childResult, err := EsClient.Search().
+			Index(childElement.Index).
+			Timeout("60s").
+			Source(childQuery).
+			From(childFrom).
+			Size(childSize).
+			Do(context.TODO())
+		if err != nil {
+			panic(err.Error())
+			return
+		}
+		log.Println("child Count:", childResult.TotalHits())
+
+		childResults := make(map[string][]*elastic.SearchHit, 0)
+		maxScoreMap := make(map[string]float64)
+		for _, child := range childResult.Hits.Hits {
+			childSource := make(map[string]interface{}, 0)
+			_ = json.Unmarshal(child.Source, &childSource)
+
+			// 키 조합.
+			var tmpKeyBuf bytes.Buffer
+			for _, childKey := range childElement.Child {
+				// :: 구분기호로 키조합.
+				tmpKeyBuf.WriteString( fmt.Sprintf("%v", childSource[childKey]) + "::" )
 			}
+			refKey := tmpKeyBuf.String()
+			childResults[refKey] = append(childResults[refKey], child)
 
-			mustQuery["must"] = must
-			boolQuery["bool"] = mustQuery
-			childQuery["query"] = boolQuery
-
-			printJson, _ := json.Marshal(childQuery)
-			log.Println(string(printJson))
-
-			childResult, err := EsClient.Search().
-				Index(childElement.Index).
-				Timeout("60s").
-				Source(childQuery).
-				From(0).
-				Size(10000).
-				Do(context.TODO())
-			if err != nil {
-				panic(err.Error())
-				return
+			if maxScoreMap[refKey] < *child.Score {
+				maxScoreMap[refKey] = *child.Score
 			}
+		}
 
+		log.Println("child key Map Length: ", len(childResults))
 
-			// 결과 조합
-			for _, parent := range parentResult.Hits.Hits {
-				parentSource := make(map[string]interface{}, 0)
-				json.Unmarshal(parent.Source, &parentSource)
+		for n, parent := range parentResult.Hits.Hits {
+			parentSource := make(map[string]interface{}, 0)
+			_ = json.Unmarshal(parent.Source, &parentSource)
+
+			// 키 조합.
+			var tmpKeyBuf bytes.Buffer
+			for _, parentKey := range childElement.Parent {
+				// :: 구분기호로 키조합.
+				tmpKeyBuf.WriteString( fmt.Sprintf("%v", parentSource[parentKey]) + "::" )
+			}
+			refKey := tmpKeyBuf.String()
+			// 키 존재 하면 parent innerHit 문서 등록
+			if parent.InnerHits == nil {
+				innerHits := make(map[string]*elastic.SearchHitInnerHits, 0)
+				parent.InnerHits = innerHits
+			}
+			fmt.Println(n, refKey)
+			if childResults[refKey] != nil {
 				var searchHitInnerHits elastic.SearchHitInnerHits
-
 				var searchHits elastic.SearchHits
 				var searchHit []*elastic.SearchHit
 				var totalHits elastic.TotalHits
 				var maxScore float64
 
-				maxScore = 0.0
-				totalHits.Value = 0
+				maxScore = maxScoreMap[refKey]
+				totalHits.Value = int64(len(childResults[refKey]))
 				totalHits.Relation = "eq"
 
-				for _, child := range childResult.Hits.Hits {
-					child.Parent = strconv.Itoa(index)
-					childSource := make(map[string]interface{}, 0)
-					json.Unmarshal(child.Source, &childSource)
-
-					if parentSource[childElement.Parent] == nil || childSource[childElement.Child] == nil {
-						continue
-					}
-					if parentSource[childElement.Parent] == childSource[childElement.Child] {
-						// 스코어 갱신
-						if maxScore < *child.Score {
-							maxScore = *child.Score
-						}
-						// 동일한 연결 적재
-						searchHit = append(searchHit, &*child)
-						// 적재 갯수 증가
-						totalHits.Value += 1
-					}
-				}
-
-				parentSearchHitInnerHits := parent.InnerHits["_child"]
-				if parentSearchHitInnerHits != nil {
-					tmpParentHits := parentSearchHitInnerHits.Hits
-					tmpParentHits.TotalHits.Value += totalHits.Value
-					tmpParentMaxScore := tmpParentHits.MaxScore
-					if maxScore > *tmpParentMaxScore {
-						tmpParentHits.MaxScore = &maxScore
-					}
-					for _, h := range searchHit {
-						tmpParentHits.Hits = append(tmpParentHits.Hits, h)
-					}
-				} else {
-					searchHits.TotalHits = &totalHits
-					searchHits.MaxScore = &maxScore
-					searchHits.Hits = searchHit
-
-					searchHitInnerHits.Hits = &searchHits
-					if parent.InnerHits == nil {
-						innerHits := make(map[string]*elastic.SearchHitInnerHits, 0)
-						parent.InnerHits = innerHits
-					}
-					parent.InnerHits["_child"] = &searchHitInnerHits
-				}
+				searchHit = childResults[refKey]
+				searchHits.Hits = searchHit
+				searchHits.MaxScore = &maxScore
+				searchHits.TotalHits = &totalHits
+				searchHitInnerHits.Hits = &searchHits
+				parent.InnerHits["_child"] = &searchHitInnerHits
 			}
 		}
 	}
 
 	response, _ := json.MarshalIndent(parentResult, "", "  ")
 	res.WriteHeader(200)
-	res.Write(response)
+	_, _ = res.Write(response)
 	return
 }
+
 
 func existsIndices(indices string) {
 	parentExists, _ := EsClient.Exists().Index(indices).Do(context.TODO())
