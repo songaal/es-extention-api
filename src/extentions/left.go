@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 )
 
 const (
@@ -172,13 +173,14 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		boolQuery := make(map[string]interface{}, 1)
 		mustQuery := make(map[string]interface{}, 1)
 		var must []interface{}
+		var filter []interface{}
 
 		for _, childKey := range childElement.Child {
 			termsQuery := make(map[string]interface{}, 1)
 			terms := make(map[string]interface{}, 1)
 			terms[childKey] = leftJoinOnWhere[index][childKey]
 			termsQuery["terms"] = terms
-			must = append(must, termsQuery)
+			filter = append(filter, termsQuery)
 		}
 
 		if len(childElement.Query) > 0 {
@@ -187,6 +189,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		}
 
 		mustQuery["must"] = must
+		mustQuery["filter"] = filter
 		boolQuery["bool"] = mustQuery
 		childQuery["query"] = boolQuery
 
@@ -214,9 +217,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 			// 키 조합.
 			var tmpKeyBuf bytes.Buffer
+			tmpKeyBuf.WriteString("ref-")
 			for _, childKey := range childElement.Child {
 				// :: 구분기호로 키조합.
-				tmpKeyBuf.WriteString( fmt.Sprintf("%v", childSource[childKey]) + "::" )
+				tmpKeyBuf.WriteString( url.QueryEscape(fmt.Sprintf("%v", childSource[childKey])) + "::" )
 			}
 			refKey := tmpKeyBuf.String()
 			childResults[refKey] = append(childResults[refKey], child)
@@ -228,15 +232,16 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 		log.Println("child key Map Length: ", len(childResults))
 
-		for n, parent := range parentResult.Hits.Hits {
+		for _, parent := range parentResult.Hits.Hits {
 			parentSource := make(map[string]interface{}, 0)
 			_ = json.Unmarshal(parent.Source, &parentSource)
 
 			// 키 조합.
 			var tmpKeyBuf bytes.Buffer
+			tmpKeyBuf.WriteString("ref-")
 			for _, parentKey := range childElement.Parent {
 				// :: 구분기호로 키조합.
-				tmpKeyBuf.WriteString( fmt.Sprintf("%v", parentSource[parentKey]) + "::" )
+				tmpKeyBuf.WriteString(url.QueryEscape(fmt.Sprintf("%v", parentSource[parentKey])) + "::" )
 			}
 			refKey := tmpKeyBuf.String()
 			// 키 존재 하면 parent innerHit 문서 등록
@@ -244,7 +249,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 				innerHits := make(map[string]*elastic.SearchHitInnerHits, 0)
 				parent.InnerHits = innerHits
 			}
-			fmt.Println(n, refKey)
+
 			if childResults[refKey] != nil {
 				var searchHitInnerHits elastic.SearchHitInnerHits
 				var searchHits elastic.SearchHits

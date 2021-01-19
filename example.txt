@@ -1,6 +1,8 @@
+# 인덱스 삭제
 DELETE /parent-index
 DELETE /child-index
 
+# parent 인덱스 생성
 PUT /parent-index
 {
   "mappings": {
@@ -17,10 +19,14 @@ PUT /parent-index
     }
   }
 }
+# child 인덱스 생성
 PUT /child-index
 {
   "mappings": {
     "properties": {
+      "pk": {
+        "type": "keyword"
+      },
       "ref": {
         "type": "keyword"
       },
@@ -30,7 +36,7 @@ PUT /child-index
     }
   }
 }
-
+# parent 데이터 등록
 POST /parent-index/_doc
 {
   "ref": "REF_00001",
@@ -39,75 +45,546 @@ POST /parent-index/_doc
 }
 POST /parent-index/_doc
 {
-  "ref": "REF_00001",
+  "ref": "REF_00002",
   "pk": "PK_00002",
   "product_name": "LG 노트북"
 }
 POST /parent-index/_doc
 {
-  "ref": "REF_00001",
+  "ref": "REF_00003",
   "pk": "PK_00003",
   "product_name": "Asus 노트북"
 }
 POST /parent-index/_doc
 {
-  "ref": "REF_00002",
+  "ref": "REF_00004",
   "pk": "PK_00004",
   "product_name": "삼성모니터"
 }
 POST /parent-index/_doc
 {
-  "ref": "REF_00002",
-  "pk": "PK_00004",
+  "ref": "REF_00006",
+  "pk": "PK_00006",
   "product_name": "LG모니터"
 }
 POST /parent-index/_doc
 {
-  "ref": "REF_00002",
-  "pk": "PK_00005",
-  "product_name": "ViewSonic 모니터"
+  "ref": "REF_00007",
+  "pk": "PK_00007",
+  "product_name": "다나와 모니터"
 }
 
+# child 데이터 등록
 POST /child-index/_doc
 {
   "ref": "REF_00001",
+  "pk": "PK_00001",
   "category": "노트북"
 }
 POST /child-index/_doc
 {
   "ref": "REF_00002",
+  "pk": "PK_00002",
   "category": "모니터"
 }
+POST /child-index/_doc
+{
+  "ref": "REF_00003",
+  "pk": "PK_00003",
+  "category": "최신 모니터"
+}
+POST /child-index/_doc
+{
+  "ref": "REF_00004",
+  "pk": "PK_00004",
+  "category": "게이밍 모니터"
+}
+POST /child-index/_doc
+{
+  "ref": "REF_00005",
+  "pk": "PK_00005",
+  "category": "관계없는 모니터"
+}
+POST /child-index/_doc
+{
+  "ref": "REF_00007",
+  "pk": "PK_00005",
+  "category": "다나와"
+}
 
-
-GET parent-index/_search
+# 데이터 확인
+GET /parent-index/_search
+{}
+GET /child-index/_search
 {}
 
 
-GET /parent-index/_left?pretty
+# left 조인
+# 하나의 필드로 left 조인하는 쿼리 입니다.
+GET /parent-index/_left
 {
   "query": {
-    "bool": {
-      "must": [
-        {
-          "term": {
-            "product_name": {
-              "value": "노트북"
-            }
-          }
-        }
-      ]
-    }
+    "match_all": {}
   },
-  "size": 30,
+  "size": 50,
   "join": {
     "index": "child-index",
     "parent": "ref",
     "child": "ref",
     "query": {
-      "match": {
-        "category": "노트북"
-      }
+      "match_all": {}
     }
+  }
+}
+
+# 두개의 필드로 left 조인하는 쿼리 입니다.
+# * 결과에서 lg모니터, 다나와 모니터는 ref, pk 값이 일치하지 않아 표시되지 않습니다.
+GET /parent-index/_left
+{
+  "query": {
+    "match_all": {}
+  },
+  "size": 50,
+  "join": {
+    "index": "child-index",
+    "parent": ["ref", "pk"],
+    "child": ["ref", "pk"],
+    "query": {
+      "match_all": {}
+    }
+  }
+}
+
+
+
+
+
+
+# 하나의 필드 Jeft 조인 OUTPUT
+{
+  "took": 1,
+  "hits": {
+    "total": {
+      "value": 6,
+      "relation": "eq"
+    },
+    "max_score": 1,
+    "hits": [
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "EJr8F3cBU9SEtblaf16K",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00001",
+          "pk": "PK_00001",
+          "product_name": "삼성 노트북"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "GJoPGHcBU9SEtblaDF5E",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00001",
+                    "pk": "PK_00001",
+                    "category": "노트북"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "EZr8F3cBU9SEtblaol7W",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00002",
+          "pk": "PK_00002",
+          "product_name": "LG 노트북"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "GZoPGHcBU9SEtblaEl7z",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00002",
+                    "pk": "PK_00002",
+                    "category": "모니터"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "Epr8F3cBU9SEtblawF6u",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00003",
+          "pk": "PK_00003",
+          "product_name": "Asus 노트북"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "GpoPGHcBU9SEtblaGV4x",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00003",
+                    "pk": "PK_00003",
+                    "category": "최신 모니터"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "E5r8F3cBU9SEtbla3V7U",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00004",
+          "pk": "PK_00004",
+          "product_name": "삼성모니터"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "G5oPGHcBU9SEtblaHl5A",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00004",
+                    "pk": "PK_00004",
+                    "category": "게이밍 모니터"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "HZoVGHcBU9SEtblalF4h",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00006",
+          "pk": "PK_00006",
+          "product_name": "LG모니터"
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "HpohGHcBU9SEtblah15o",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00007",
+          "pk": "PK_00007",
+          "product_name": "다나와 모니터"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "IZokGHcBU9SEtblaN17E",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00007",
+                    "pk": "PK_00005",
+                    "category": "다나와"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "failed": 0
+  }
+}
+
+
+# 두개의 필드 Left 조인 OUTPUT
+{
+  "took": 1,
+  "hits": {
+    "total": {
+      "value": 6,
+      "relation": "eq"
+    },
+    "max_score": 1,
+    "hits": [
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "EJr8F3cBU9SEtblaf16K",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00001",
+          "pk": "PK_00001",
+          "product_name": "삼성 노트북"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "GJoPGHcBU9SEtblaDF5E",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00001",
+                    "pk": "PK_00001",
+                    "category": "노트북"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "EZr8F3cBU9SEtblaol7W",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00002",
+          "pk": "PK_00002",
+          "product_name": "LG 노트북"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "GZoPGHcBU9SEtblaEl7z",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00002",
+                    "pk": "PK_00002",
+                    "category": "모니터"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "Epr8F3cBU9SEtblawF6u",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00003",
+          "pk": "PK_00003",
+          "product_name": "Asus 노트북"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "GpoPGHcBU9SEtblaGV4x",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00003",
+                    "pk": "PK_00003",
+                    "category": "최신 모니터"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "E5r8F3cBU9SEtbla3V7U",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00004",
+          "pk": "PK_00004",
+          "product_name": "삼성모니터"
+        },
+        "inner_hits": {
+          "_child": {
+            "hits": {
+              "total": {
+                "value": 1,
+                "relation": "eq"
+              },
+              "max_score": 1,
+              "hits": [
+                {
+                  "_score": 1,
+                  "_index": "child-index",
+                  "_type": "_doc",
+                  "_id": "G5oPGHcBU9SEtblaHl5A",
+                  "_seq_no": null,
+                  "_primary_term": null,
+                  "_source": {
+                    "ref": "REF_00004",
+                    "pk": "PK_00004",
+                    "category": "게이밍 모니터"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "HZoVGHcBU9SEtblalF4h",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00006",
+          "pk": "PK_00006",
+          "product_name": "LG모니터"
+        }
+      },
+      {
+        "_score": 1,
+        "_index": "parent-index",
+        "_type": "_doc",
+        "_id": "HpohGHcBU9SEtblah15o",
+        "_seq_no": null,
+        "_primary_term": null,
+        "_source": {
+          "ref": "REF_00007",
+          "pk": "PK_00007",
+          "product_name": "다나와 모니터"
+        }
+      }
+    ]
+  },
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "failed": 0
   }
 }
