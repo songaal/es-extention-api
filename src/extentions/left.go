@@ -51,11 +51,12 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Join 필드 추출.
+	originJoinList := make([]map[string]interface{}, 0)
 	var leftJoinList []model.LeftJoin
 	if utils.TypeOf(leftRequest[JoinField]) == "list" {
 		// join 여러개
 		_ = mapstructure.Decode(leftRequest[JoinField], &leftJoinList)
-
+		_ = mapstructure.Decode(leftRequest[JoinField], &originJoinList)
 	} else if utils.TypeOf(leftRequest[JoinField]) == "object" {
 		// parent, child 필드 추출
 		tmpLeftJoinMap := make(map[string]interface{}, 0)
@@ -79,6 +80,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		leftJoin.Parent = tmpParentList
 		leftJoin.Child = tmpChildList
 		leftJoinList = append(leftJoinList, leftJoin)
+		originJoinList = append(originJoinList, tmpLeftJoinMap)
 	}
 
 	// 메인 쿼리에서 join 필드 제거.
@@ -89,6 +91,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	if parentQuery["from"] == nil {
 		parentQuery["from"] = 0
 	}
+
 	if parentQuery["size"] == nil {
 		parentQuery["size"] = 20
 	}
@@ -156,11 +159,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 	}
-	log.Println("", leftJoinOnWhere)
 
 	for index, childElement := range leftJoinList {
 		childFrom := 0
-		childSize := 10000
+		childSize := parentQuery["size"]
 		if childElement.From > 0 {
 			childFrom = childElement.From
 		}
@@ -168,19 +170,22 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			childSize = childElement.Size
 		}
 
+
 		// child 쿼리 ES 조회
-		childQuery := make(map[string]interface{}, 1)
+		//childQuery := make(map[string]interface{}, 1)
 		boolQuery := make(map[string]interface{}, 1)
 		mustQuery := make(map[string]interface{}, 1)
 		var must []interface{}
-		var filter []interface{}
+		//var filter []interface{}
 
 		for _, childKey := range childElement.Child {
-			termsQuery := make(map[string]interface{}, 1)
-			terms := make(map[string]interface{}, 1)
-			terms[childKey] = leftJoinOnWhere[index][childKey]
-			termsQuery["terms"] = terms
-			filter = append(filter, termsQuery)
+			if len(leftJoinOnWhere[index][childKey]) > 0 {
+				termsQuery := make(map[string]interface{}, 1)
+				terms := make(map[string]interface{}, 1)
+				terms[childKey] = leftJoinOnWhere[index][childKey]
+				termsQuery["terms"] = terms
+				must = append(must, termsQuery)
+			}
 		}
 
 		if len(childElement.Query) > 0 {
@@ -189,19 +194,31 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		}
 
 		mustQuery["must"] = must
-		mustQuery["filter"] = filter
 		boolQuery["bool"] = mustQuery
-		childQuery["query"] = boolQuery
+		//childQuery["query"] = boolQuery
+		//
+		//childQuery["from"] = childFrom
+		//childQuery["size"] = childSize
 
-		printJson, _ := json.Marshal(childQuery)
+		delete(originJoinList[index], "index")
+		delete(originJoinList[index], "parent")
+		delete(originJoinList[index], "child")
+		delete(originJoinList[index], "query")
+
+		delete(originJoinList[index], "from")
+		delete(originJoinList[index], "size")
+
+		originJoinList[index]["query"] = boolQuery
+		originJoinList[index]["from"] = childFrom
+		originJoinList[index]["size"] = childSize
+
+		printJson, _ := json.Marshal(originJoinList)
 		log.Println(string(printJson))
 
 		childResult, err := EsClient.Search().
 			Index(childElement.Index).
 			Timeout("60s").
-			Source(childQuery).
-			From(childFrom).
-			Size(childSize).
+			Source(originJoinList[index]).
 			Do(context.TODO())
 		if err != nil {
 			panic(err.Error())
@@ -244,11 +261,6 @@ func Left(res http.ResponseWriter, req *http.Request) {
 				tmpKeyBuf.WriteString(url.QueryEscape(fmt.Sprintf("%v", parentSource[parentKey])) + "::" )
 			}
 			refKey := tmpKeyBuf.String()
-			// 키 존재 하면 parent innerHit 문서 등록
-			if parent.InnerHits == nil {
-				innerHits := make(map[string]*elastic.SearchHitInnerHits, 0)
-				parent.InnerHits = innerHits
-			}
 
 			if childResults[refKey] != nil {
 				var searchHitInnerHits elastic.SearchHitInnerHits
@@ -266,7 +278,22 @@ func Left(res http.ResponseWriter, req *http.Request) {
 				searchHits.MaxScore = &maxScore
 				searchHits.TotalHits = &totalHits
 				searchHitInnerHits.Hits = &searchHits
-				parent.InnerHits["_child"] = &searchHitInnerHits
+
+				// 키 존재 하면 parent innerHit 문서 등록
+				if parent.InnerHits == nil {
+					// 기존 innerHit 미존재
+					innerHits := make(map[string]*elastic.SearchHitInnerHits, 0)
+					parent.InnerHits = innerHits
+					parent.InnerHits["_child"] = &searchHitInnerHits
+				} else {
+					// 기존 innerHit 존재
+					searchHits := parent.InnerHits["_child"]
+					if *searchHits.Hits.MaxScore < maxScoreMap[refKey] {
+						*searchHits.Hits.MaxScore = maxScoreMap[refKey]
+					}
+					searchHits.Hits.TotalHits.Value = searchHits.Hits.TotalHits.Value + int64(len(childResults[refKey]))
+					searchHits.Hits.Hits = append(searchHits.Hits.Hits, childResults[refKey]...)
+				}
 			}
 		}
 	}

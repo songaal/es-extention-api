@@ -7,7 +7,7 @@ type LeftJoin struct {
 	Query map[string]interface{} `json:"query"`
 	Size int `json:"size"`
 	From int `json:"from"`
-
+	Source interface{} `json:"_source"`
 }
 
 
