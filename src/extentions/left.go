@@ -52,7 +52,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 	// Join 필드 추출.
 	originJoinList := make([]map[string]interface{}, 0)
-	var leftJoinList []model.LeftJoin
+	leftJoinList := make([]model.LeftJoin, 0)
 	if utils.TypeOf(leftRequest[JoinField]) == "list" {
 		// join 여러개
 		_ = mapstructure.Decode(leftRequest[JoinField], &leftJoinList)
@@ -94,6 +94,41 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 	if parentQuery["size"] == nil {
 		parentQuery["size"] = 20
+	}
+
+	parentSource := make(map[string][]string, 0)
+	parentSource["includes"] = []string{}
+	parentSource["excludes"] = []string{}
+
+	for _, l := range leftJoinList {
+		parentSource["includes"] = append(parentSource["includes"], l.Parent...)
+	}
+	if utils.TypeOf(parentQuery["_source"]) == "list" {
+		source := make([]string, 0)
+		_ = mapstructure.Decode(parentQuery["_source"], &source)
+		parentSource["includes"] = append(parentSource["includes"], source...)
+		parentQuery["_source"] = parentSource
+	} else if utils.TypeOf(parentQuery["_source"]) == "object" {
+		includes := make([]string, 0)
+		excludes := make([]string, 0)
+		source := make(map[string]interface{}, 0)
+		_ = mapstructure.Decode(parentQuery["_source"], &source)
+		if source["includes"] != nil {
+			_ = mapstructure.Decode(source["includes"], &includes)
+		}
+		if source["excludes"] != nil {
+			_ = mapstructure.Decode(source["excludes"], &excludes)
+		}
+		parentSource["includes"] = append(parentSource["includes"], includes...)
+		parentSource["excludes"] = append(parentSource["excludes"], excludes...)
+		parentQuery["_source"] = parentSource
+	} else if utils.TypeOf(parentQuery["_source"]) == "string" {
+		parentSource["includes"] = append(parentSource["includes"], fmt.Sprintf("%v", parentQuery["_source"]))
+		parentQuery["_source"] = parentSource
+	} else if utils.TypeOf(parentQuery["_source"]) == "bool" && parentQuery["_source"] == false {
+		parentQuery["_source"] = parentSource
+	} else {
+		parentQuery["_source"] = true
 	}
 
 	// parent indices 존재 여부
@@ -170,9 +205,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			childSize = childElement.Size
 		}
 
-
 		// child 쿼리 ES 조회
-		//childQuery := make(map[string]interface{}, 1)
 		boolQuery := make(map[string]interface{}, 1)
 		mustQuery := make(map[string]interface{}, 1)
 		var must []interface{}
@@ -195,10 +228,6 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 		mustQuery["must"] = must
 		boolQuery["bool"] = mustQuery
-		//childQuery["query"] = boolQuery
-		//
-		//childQuery["from"] = childFrom
-		//childQuery["size"] = childSize
 
 		delete(originJoinList[index], "index")
 		delete(originJoinList[index], "parent")
@@ -211,6 +240,39 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		originJoinList[index]["query"] = boolQuery
 		originJoinList[index]["from"] = childFrom
 		originJoinList[index]["size"] = childSize
+
+
+		childSource := make(map[string][]string, 0)
+		childSource["includes"] = []string{}
+		childSource["excludes"] = []string{}
+		childSource["includes"] = append(childSource["includes"], childElement.Child...)
+		if utils.TypeOf(originJoinList[index]["_source"]) == "list" {
+			source := make([]string, 0)
+			_ = mapstructure.Decode(originJoinList[index]["_source"], &source)
+			childSource["includes"] = append(childSource["includes"], source...)
+			originJoinList[index]["_source"] = childSource
+		} else if utils.TypeOf(originJoinList[index]["_source"]) == "object" {
+			includes := make([]string, 0)
+			excludes := make([]string, 0)
+			source := make(map[string]interface{}, 0)
+			_ = mapstructure.Decode(originJoinList[index]["_source"], &source)
+			if source["includes"] != nil {
+				_ = mapstructure.Decode(source["includes"], &includes)
+			}
+			if source["excludes"] != nil {
+				_ = mapstructure.Decode(source["excludes"], &excludes)
+			}
+			childSource["includes"] = append(childSource["includes"], includes...)
+			childSource["excludes"] = append(childSource["excludes"], excludes...)
+			originJoinList[index]["_source"] = childSource
+		} else if utils.TypeOf(originJoinList[index]["_source"]) == "string" {
+			childSource["includes"] = append(childSource["includes"], fmt.Sprintf("%v", originJoinList[index]["_source"]))
+			originJoinList[index]["_source"] = childSource
+		} else if utils.TypeOf(originJoinList[index]["_source"]) == "bool" && originJoinList[index]["_source"] == false {
+			originJoinList[index]["_source"] = childSource
+		} else {
+			originJoinList[index]["_source"] = true
+		}
 
 		printJson, _ := json.Marshal(originJoinList)
 		log.Println(string(printJson))

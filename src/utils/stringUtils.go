@@ -44,6 +44,8 @@ func TypeOf(v interface{}) string {
 		return "float64"
 	case string:
 		return "string"
+	case bool:
+		return "bool"
 	case []interface{}:
 		return "list"
 	case []string:
