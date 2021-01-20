@@ -8,6 +8,9 @@ es-extention-api를 통해 엘라스틱서치 연결을 하면 /_left 엔드포�
 
 _search 유사하게 조인 QueryDSL를 작성하게 되면 innerHits에 _child를 포함한 결과를 받을 수 있습니다.
 
+자세한 내용은 다나와 기술블로그를 확인해주세요.
+https://danawalab.github.io/elastic/2021/01/06/elasticsearch-left-join-proxy.html
+
 ```
 GET /parent-index/_left
 {
