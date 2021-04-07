@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const (
@@ -27,7 +28,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		if v != nil {
 			log.Println("error:", v)
 			res.WriteHeader(400)
-			res.Write([]byte("{\"error\": " + fmt.Sprintln(v) + "}"))
+			_, _ = res.Write([]byte("{\"error\": " + fmt.Sprintln(v) + "}"))
 		}
 	}()
 
@@ -55,8 +56,34 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	leftJoinList := make([]model.LeftJoin, 0)
 	if utils.TypeOf(leftRequest[JoinField]) == "list" {
 		// join 여러개
-		_ = mapstructure.Decode(leftRequest[JoinField], &leftJoinList)
-		_ = mapstructure.Decode(leftRequest[JoinField], &originJoinList)
+		tmpJoinList := make([]model.TmpLeftJoin, 0)
+		_ = mapstructure.Decode(leftRequest[JoinField], &tmpJoinList)
+
+		for _, val := range tmpJoinList {
+			leftJoin := model.LeftJoin{}
+			leftJoin.Index = val.Index
+			leftJoin.Parent = strings.Split(val.Parent, ",")
+			leftJoin.Child = strings.Split(val.Child, ",")
+			leftJoin.From = val.From
+			leftJoin.Size = val.Size
+			leftJoin.Query = val.Query
+			if val.Source != nil {
+				leftJoin.Source = val.Source
+			}
+			leftJoinList = append(leftJoinList, leftJoin)
+
+			originJoin := make(map[string]interface{})
+			originJoin["index"] = val.Index
+			originJoin["parent"] = val.Parent
+			originJoin["child"] = strings.Split(val.Parent, ",")
+			originJoin["from"] = strings.Split(val.Child, ",")
+			originJoin["size"] = val.Size
+			originJoin["query"] = val.Query
+			if val.Source != nil {
+				originJoin["source"] = val.Source
+			}
+			originJoinList = append(originJoinList, originJoin)
+		}
 	} else if utils.TypeOf(leftRequest[JoinField]) == "object" {
 		// parent, child 필드 추출
 		tmpLeftJoinMap := make(map[string]interface{}, 0)
@@ -283,6 +310,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			Source(originJoinList[index]).
 			Do(context.TODO())
 		if err != nil {
+			fmt.Println(err)
 			panic(err.Error())
 			return
 		}
