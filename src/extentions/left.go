@@ -130,6 +130,8 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	for _, l := range leftJoinList {
 		parentSource["includes"] = append(parentSource["includes"], l.Parent...)
 	}
+
+	isHideHits := false
 	if utils.TypeOf(parentQuery["_source"]) == "list" {
 		source := make([]string, 0)
 		_ = mapstructure.Decode(parentQuery["_source"], &source)
@@ -154,6 +156,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		parentQuery["_source"] = parentSource
 	} else if utils.TypeOf(parentQuery["_source"]) == "bool" && parentQuery["_source"] == false {
 		parentQuery["_source"] = parentSource
+		isHideHits = true
 	} else {
 		parentQuery["_source"] = true
 	}
@@ -219,6 +222,14 @@ func Left(res http.ResponseWriter, req *http.Request) {
 					leftJoinOnWhere[index][strChildKey] = append(leftJoinOnWhere[index][strChildKey], parentRefValue)
 				}
 			}
+		}
+	}
+
+	totalAggregations := map[string]json.RawMessage{}
+
+	if parentResult.Aggregations != nil {
+		for k, v := range parentResult.Aggregations {
+			totalAggregations[k] = v
 		}
 	}
 
@@ -337,6 +348,12 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 
+		if childResult.Aggregations != nil {
+			for k, v := range childResult.Aggregations {
+				totalAggregations[k] = v
+			}
+		}
+
 		log.Println("child key Map Length: ", len(childResults))
 
 		for _, parent := range parentResult.Hits.Hits {
@@ -351,8 +368,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 				tmpKeyBuf.WriteString(url.QueryEscape(fmt.Sprintf("%v", parentSource[parentKey])) + "::" )
 			}
 			refKey := tmpKeyBuf.String()
-
-			if childResults[refKey] != nil {
+			
+			if isHideHits {
+				parent.Source = nil
+			} else if childResults[refKey] != nil {
 				var searchHitInnerHits elastic.SearchHitInnerHits
 				var searchHits elastic.SearchHits
 				var searchHit []*elastic.SearchHit
@@ -386,6 +405,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 				}
 			}
 		}
+	}
+
+	if totalAggregations != nil && len(totalAggregations) > 0 {
+		parentResult.Aggregations = totalAggregations
 	}
 
 	response, _ := json.MarshalIndent(parentResult, "", "  ")
