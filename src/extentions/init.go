@@ -11,30 +11,37 @@ import (
 )
 
 var (
-	GoEnv          = utils.GetArg("go.env", "development", os.Args)
-	EsTargetList = strings.Split(utils.GetArg("es.urls", "http://elasticsearch:9200", os.Args), ",")
-	EsUser       = utils.GetArg("es.user", "", os.Args)
-	EsPassword   = utils.GetArg("es.password", "", os.Args)
-	EsClient     = elastic.Client{}
+	GoEnv         = utils.GetArg("go.env", "development", os.Args)
+	esUrl         = utils.GetArg("es.urls", "http://elasticsearch:9200", os.Args)
+	esUser        = utils.GetArg("es.user", "", os.Args)
+	esPass        = utils.GetArg("es.password", "", os.Args)
+	DefaultClient = elastic.Client{}
 )
 
 func Initialize() {
 	log.Println("init.")
-	log.Println("es list:", EsTargetList)
-	tmpEsClient, err := elastic.NewClient(
-		elastic.SetURL(EsTargetList...),
-		elastic.SetBasicAuth(EsUser, EsPassword),
+	log.Println("es list:", esUrl)
+	if tmpEsClient, err := GetClient(esUrl, esUser, esPass); err != nil {
+		log.Println("ES Connection ERROR", err)
+		panic("ES Connection ERROR" + fmt.Sprintln(err))
+	} else {
+		DefaultClient = tmpEsClient
+	}
+}
+
+func GetClient(host, user, password string) (client elastic.Client, err error) {
+	if tmpEsClient, tmpErr := elastic.NewClient(
+		elastic.SetURL(strings.Split(host, ",")...),
+		elastic.SetBasicAuth(user, password),
 		elastic.SetHealthcheckInterval(10*time.Second),
 		elastic.SetMaxRetries(3),
 		elastic.SetGzip(true),
 		elastic.SetSniff(false),
 		elastic.SetTraceLog(log.New(os.Stdout, "", log.Ltime|log.Lshortfile)),
-		)
-
-	if err != nil {
-		log.Println("ES Connection ERROR", err)
-		panic("ES Connection ERROR" + fmt.Sprintln(err))
+	); tmpErr != nil {
+		err = tmpErr
 	} else {
-		EsClient = *tmpEsClient
+		client = *tmpEsClient
 	}
+	return
 }

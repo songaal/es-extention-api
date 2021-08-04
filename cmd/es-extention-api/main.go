@@ -30,7 +30,7 @@ func main() {
 
 	// 라우팅
 	router := mux.NewRouter()
-	router.HandleFunc("/{indices:[a-zA-Z0-9-_.,*]+}/_left", extentions.Left)
+	router.HandleFunc("/{indices:[a-zA-Z0-9-_.,*]+}/_join", extentions.Join)
 	router.HandleFunc("/{uri:.*}", extentions.Default)
 
 	// listen..

@@ -7,22 +7,15 @@ import (
 	"fmt"
 	"github.com/danawalab/es-extention-api/src/model"
 	"github.com/danawalab/es-extention-api/src/utils"
-	"github.com/gorilla/mux"
 	"github.com/mitchellh/mapstructure"
 	"github.com/olivere/elastic/v7"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
-const (
-	JoinField = "join"
-	usage = "{\n\"usage\":  \nGET /parent-index/_left\n{\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        {\n          \"term\": {\n            \"pk\": {\n              \"value\": \"PK_00003\"\n            }\n          }\n        }\n      ]\n    }\n  },\n  \"join\": {\n    \"index\": \"child-index\",\n    \"parent\": \"parent-field\",\n    \"child\": \"child-field\",\n    \"query\": {\n      \"bool\": {\n        \"must\": [\n          {\n            \"term\": {\n              \"ref.keyword\": {\n                \"value\": \"REF_00003\"\n              }\n            }\n          }\n        ]\n      }\n    }\n  }\n}\n}"
-)
-
-func Left(res http.ResponseWriter, req *http.Request) {
+func Left(indices string, leftRequest map[string]interface{}, res http.ResponseWriter, req *http.Request) {
 	defer func() {
 		v := recover()
 		if v != nil {
@@ -32,38 +25,41 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		}
 	}()
 
-	reqJson, _ := json.Marshal(req)
-	log.Println("left : " + string(reqJson))
+	//reqJson, _ := json.Marshal(req)
+	//log.Println("left : " + string(reqJson))
 
 	// Parent 인덱스 조회
-	vars := mux.Vars(req)
-	indices := vars["indices"]
+	//vars := mux.Vars(req)
+	//indices := vars["indices"]
 
-	var leftRequest map[string]interface{}
+	//var leftRequest map[string]interface{}
 
 	// Request Body 파싱
-	defer req.Body.Close()
-	read, _ := ioutil.ReadAll(req.Body)
-	err := json.Unmarshal(read, &leftRequest)
-	if err != nil {
-		res.WriteHeader(400)
-		_, _ = res.Write([]byte("{\"error\": \"" + err.Error() + "\"}"))
-		return
-	}
+	//defer req.Body.Close()
+	//read, _ := ioutil.ReadAll(req.Body)
+	//err := json.Unmarshal(read, &leftRequest)
+	//if err != nil {
+	//	res.WriteHeader(400)
+	//	_, _ = res.Write([]byte("{\"error\": \"" + err.Error() + "\"}"))
+	//	return
+	//}
 
 	// Join 필드 추출.
 	originJoinList := make([]map[string]interface{}, 0)
 	leftJoinList := make([]model.LeftJoin, 0)
-	if utils.TypeOf(leftRequest[JoinField]) == "list" {
+	if utils.TypeOf(leftRequest["join"]) == "list" {
 		// join 여러개
 		tmpJoinList := make([]model.TmpLeftJoin, 0)
-		_ = mapstructure.Decode(leftRequest[JoinField], &tmpJoinList)
+		_ = mapstructure.Decode(leftRequest["join"], &tmpJoinList)
 
 		for _, val := range tmpJoinList {
 			leftJoin := model.LeftJoin{}
 			leftJoin.Index = val.Index
 			leftJoin.Parent = strings.Split(val.Parent, ",")
 			leftJoin.Child = strings.Split(val.Child, ",")
+			leftJoin.Host = val.Host
+			leftJoin.Username = val.Username
+			leftJoin.Password = val.Password
 			leftJoin.From = val.From
 			leftJoin.Size = val.Size
 			leftJoin.Query = val.Query
@@ -84,10 +80,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			}
 			originJoinList = append(originJoinList, originJoin)
 		}
-	} else if utils.TypeOf(leftRequest[JoinField]) == "object" {
+	} else if utils.TypeOf(leftRequest["join"]) == "object" {
 		// parent, child 필드 추출
 		tmpLeftJoinMap := make(map[string]interface{}, 0)
-		_ = mapstructure.Decode(leftRequest[JoinField], &tmpLeftJoinMap)
+		_ = mapstructure.Decode(leftRequest["join"], &tmpLeftJoinMap)
 		tmpParentList := make([]string, 0)
 		tmpChildList := make([]string, 0)
 		if utils.TypeOf(tmpLeftJoinMap["parent"]) == "list" && utils.TypeOf(tmpLeftJoinMap["child"]) == "list" {
@@ -103,7 +99,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 		// Child Left Join 필드 추출
 		leftJoin := model.LeftJoin{}
-		_ = mapstructure.Decode(leftRequest[JoinField], &leftJoin)
+		_ = mapstructure.Decode(leftRequest["join"], &leftJoin)
 		leftJoin.Parent = tmpParentList
 		leftJoin.Child = tmpChildList
 		leftJoinList = append(leftJoinList, leftJoin)
@@ -111,7 +107,8 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// 메인 쿼리에서 join 필드 제거.
-	delete(leftRequest, JoinField)
+	delete(leftRequest, "join")
+	delete(leftRequest, TypeField)
 	parentQuery := leftRequest
 
 	// 조회 건 수 기본값 할당.
@@ -162,10 +159,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// parent indices 존재 여부
-	existsIndices(indices)
+	//ExistsIndices(parentClient, indices)
 
 	// Parent 엘라스틱 서치 조회
-	parentResult, err := EsClient.Search().
+	parentResult, err := DefaultClient.Search().
 		Index(indices).
 		Timeout("60s").
 		Source(parentQuery).
@@ -186,7 +183,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 
 		for index, childElement := range leftJoinList {
 			// child index 존재 확인.
-			existsIndices(childElement.Index)
+			//ExistsIndices(childClient, childElement.Index)
 
 			parentKey := childElement.Parent
 			childKey := childElement.Child
@@ -243,6 +240,11 @@ func Left(res http.ResponseWriter, req *http.Request) {
 			childSize = childElement.Size
 		}
 
+		childClient := DefaultClient
+		if childElement.Host != "" {
+			childClient, _ = GetClient(childElement.Host, childElement.Username, childElement.Password)
+		}
+
 		// child 쿼리 ES 조회
 		boolQuery := make(map[string]interface{}, 1)
 		mustQuery := make(map[string]interface{}, 1)
@@ -271,6 +273,10 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		delete(originJoinList[index], "parent")
 		delete(originJoinList[index], "child")
 		delete(originJoinList[index], "query")
+
+		delete(originJoinList[index], "host")
+		delete(originJoinList[index], "username")
+		delete(originJoinList[index], "password")
 
 		delete(originJoinList[index], "from")
 		delete(originJoinList[index], "size")
@@ -315,7 +321,7 @@ func Left(res http.ResponseWriter, req *http.Request) {
 		printJson, _ := json.Marshal(originJoinList)
 		log.Println(string(printJson))
 
-		childResult, err := EsClient.Search().
+		childResult, err := childClient.Search().
 			Index(childElement.Index).
 			Timeout("60s").
 			Source(originJoinList[index]).
@@ -418,9 +424,3 @@ func Left(res http.ResponseWriter, req *http.Request) {
 }
 
 
-func existsIndices(indices string) {
-	parentExists, _ := EsClient.Exists().Index(indices).Do(context.TODO())
-	if parentExists {
-		panic("{\n  \"error\" : {\n    \"root_cause\" : [\n      {\n        \"type\" : \"index_not_found_exception\",\n        \"reason\" : \"no such index [" + indices + "]\",\n        \"resource.type\" : \"index_or_alias\",\n        \"resource.id\" : \"" + indices + " \",\n        \"index_uuid\" : \"_na_\",\n        \"index\" : \"" + indices + "\"\n      }\n    ],\n    \"type\" : \"index_not_found_exception\",\n    \"reason\" : \"no such index [" + indices + "]\",\n    \"resource.type\" : \"index_or_alias\",\n    \"resource.id\" : \"" + indices + "\",\n    \"index_uuid\" : \"_na_\",\n    \"index\" : \"" + indices + "\"\n  },\n  \"status\" : 404\n}\n")
-	}
-}
