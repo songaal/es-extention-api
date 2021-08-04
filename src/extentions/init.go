@@ -37,7 +37,7 @@ func GetClient(host, user, password string) (client elastic.Client, err error) {
 		elastic.SetMaxRetries(3),
 		elastic.SetGzip(true),
 		elastic.SetSniff(false),
-		elastic.SetTraceLog(log.New(os.Stdout, "", log.Ltime|log.Lshortfile)),
+		//elastic.SetTraceLog(log.New(os.Stdout, "", log.Ltime|log.Lshortfile)),
 	); tmpErr != nil {
 		err = tmpErr
 	} else {

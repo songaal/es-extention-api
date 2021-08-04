@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 /**
@@ -93,7 +94,7 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		childQuery["size"] = 10000
 	}
 	childQuery["_source"] = true
-
+	st1 := time.Now().Unix()
 	cResp, e := cClient.Search().
 		Index(childIndices).
 		FilterPath("hits.hits").
@@ -104,6 +105,8 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		log.Println(e, cResp)
 		panic(e)
 	}
+	nt1 := time.Now().Unix()
+	log.Println("키 조회 소요시간 " + strconv.Itoa(int(nt1-st1)) + "s")
 
 	if len(cResp.Hits.Hits) == 0 {
 		zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
@@ -161,6 +164,7 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	}
 
 	// parent 조회
+	st2 := time.Now().Unix()
 	pResp, e := pClient.Search().
 		Index(indices).
 		Timeout("120s").
@@ -170,6 +174,8 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		log.Println(e, pResp)
 		panic(e)
 	}
+	nt2 := time.Now().Unix()
+	log.Println("메인 쿼리 조회 소요시간 " + strconv.Itoa(int(nt2-st2)) + "s")
 
 	if len(pResp.Hits.Hits) == 0 {
 		zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
@@ -179,11 +185,11 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	}
 
 	// inner_hits 추가할 child 조회
-	//termsQueryJson, _ = json.Marshal(getTermsQuery(*pResp.Hits, childKeyList, parentKeyList))
+	termsQueryJson, _ = json.Marshal(getTermsQuery(*pResp.Hits, childKeyList, parentKeyList))
 	childQueryJson, _ := json.Marshal(childQuery["query"])
-	//tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
+	tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
 	// parent, child 타입이 text 일 경우 안나오는현상 발생
-	tempQuery = getTempQuery(string(childQueryJson), "null")
+	//tempQuery = getTempQuery(string(childQueryJson), "null")
 	searchQuery = make(map[string]interface{})
 	_ = json.Unmarshal([]byte(tempQuery), &searchQuery)
 	for k, v := range childQuery {
@@ -226,6 +232,7 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	}
 
 	// child 조회
+	st3 := time.Now().Unix()
 	cResp, e = cClient.Search().
 		Index(childIndices).
 		Timeout("120s").
@@ -235,6 +242,8 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		log.Println(e, cResp)
 		panic(e)
 	}
+	nt3 := time.Now().Unix()
+	log.Println("메인 쿼리 조회 소요시간 " + strconv.Itoa(int(nt3-st3)) + "s")
 
 	log.Println("서브 쿼리 조회 결과 갯수: " + childIndices + ", " +strconv.Itoa(len(cResp.Hits.Hits)))
 
