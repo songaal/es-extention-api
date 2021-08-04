@@ -21,7 +21,7 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 		if v != nil {
 			log.Println("error:", v)
 			res.WriteHeader(400)
-			_, _ = res.Write([]byte("{\"error\": " + fmt.Sprintln(v) + "}"))
+			_, _ = res.Write([]byte("{\"error\": \"" + fmt.Sprint(v) + "\"}"))
 		}
 	}()
 
@@ -168,8 +168,8 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 		Source(parentQuery).
 		Do(context.TODO())
 	if err != nil {
-		log.Println(err)
-		panic(err.Error())
+		log.Println(err, parentResult)
+		panic(err)
 		return
 	}
 
@@ -327,8 +327,8 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 			Source(originJoinList[index]).
 			Do(context.TODO())
 		if err != nil {
-			fmt.Println(err)
-			panic(err.Error())
+			fmt.Println(err, childResult)
+			panic(err)
 			return
 		}
 		log.Println("child Count:", childResult.TotalHits())

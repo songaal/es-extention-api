@@ -99,8 +99,8 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		Source(childQuery).
 		Do(context.TODO())
 	if e != nil {
-		log.Println(e)
-		panic(e.Error())
+		log.Println(e, cResp)
+		panic(e)
 	}
 
 	if len(cResp.Hits.Hits) == 0 {
@@ -163,8 +163,8 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		Source(searchQuery).
 		Do(context.TODO())
 	if e != nil {
-		log.Println(e)
-		panic(e.Error())
+		log.Println(e, pResp)
+		panic(e)
 	}
 
 	// inner_hits 추가할 child 조회
@@ -186,8 +186,8 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		Source(searchQuery).
 		Do(context.TODO())
 	if e != nil {
-		log.Println(e)
-		panic(e.Error())
+		log.Println(e, cResp)
+		panic(e)
 	}
 
 	refHits, maxScoreMap := getRefSet(*cResp.Hits, childKeyList)

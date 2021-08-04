@@ -34,7 +34,7 @@ func Join(res http.ResponseWriter, req *http.Request) {
 		if v != nil {
 			log.Println("error:", v)
 			res.WriteHeader(400)
-			_, _ = res.Write([]byte("{\"error\": " + fmt.Sprintln(v) + "}"))
+			_, _ = res.Write([]byte("{\"error\": \"" + fmt.Sprint(v) + "\"}"))
 		}
 	}()
 
@@ -47,7 +47,7 @@ func Join(res http.ResponseWriter, req *http.Request) {
 	// Request Body 파싱
 	fullQuery, e := parseBody(req.Body)
 	if e != nil {
-		panic(e.Error())
+		panic(e)
 	}
 	// parent 인덱스 조회
 	vars := mux.Vars(req)
