@@ -10,6 +10,7 @@ import (
 	"github.com/olivere/elastic/v7"
 	"log"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -92,6 +93,7 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		childQuery["size"] = 10000
 	}
 	childQuery["_source"] = true
+
 	cResp, e := cClient.Search().
 		Index(childIndices).
 		FilterPath("hits.hits").
@@ -107,6 +109,8 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
 		_ = json.Unmarshal([]byte(zero), &results)
 		return
+	}else {
+		log.Println("키 추출 조회 결과 갯수: " + childIndices + ", " + strconv.Itoa(len(cResp.Hits.Hits)))
 	}
 
 	// 쿼리 생성
@@ -167,16 +171,58 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		panic(e)
 	}
 
+	if len(pResp.Hits.Hits) == 0 {
+		zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
+		_ = json.Unmarshal([]byte(zero), &results)
+	} else {
+		log.Println("메인 쿼리 조회 결과 갯수: " + indices + ", " + strconv.Itoa(len(pResp.Hits.Hits)))
+	}
+
 	// inner_hits 추가할 child 조회
 	termsQueryJson, _ = json.Marshal(getTermsQuery(*pResp.Hits, childKeyList, parentKeyList))
 	childQueryJson, _ := json.Marshal(childQuery["query"])
-	tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
+	//tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
+	// parent, child 타입이 text 일 경우 안나오는현상 발생
+	tempQuery = getTempQuery(string(childQueryJson), "null")
 	searchQuery = make(map[string]interface{})
 	_ = json.Unmarshal([]byte(tempQuery), &searchQuery)
 	for k, v := range childQuery {
 		if k != "query" {
 			searchQuery[k] = v
 		}
+	}
+
+	cSource := make(map[string][]string, 0)
+	cSource["includes"] = []string{}
+	cSource["excludes"] = []string{}
+	cSource["includes"] = childKeyList
+
+	if utils.TypeOf(searchQuery["_source"]) == "list" {
+		source := make([]string, 0)
+		_ = mapstructure.Decode(searchQuery["_source"], &source)
+		cSource["includes"] = append(cSource["includes"], source...)
+		searchQuery["_source"] = cSource
+	} else if utils.TypeOf(searchQuery["_source"]) == "object" {
+		includes := make([]string, 0)
+		excludes := make([]string, 0)
+		source := make(map[string]interface{}, 0)
+		_ = mapstructure.Decode(searchQuery["_source"], &source)
+		if source["includes"] != nil {
+			_ = mapstructure.Decode(source["includes"], &includes)
+		}
+		if source["excludes"] != nil {
+			_ = mapstructure.Decode(source["excludes"], &excludes)
+		}
+		cSource["includes"] = append(cSource["includes"], includes...)
+		cSource["excludes"] = append(cSource["excludes"], excludes...)
+		searchQuery["_source"] = cSource
+	} else if utils.TypeOf(searchQuery["_source"]) == "string" {
+		cSource["includes"] = append(cSource["includes"], fmt.Sprintf("%v", searchQuery["_source"]))
+		searchQuery["_source"] = cSource
+	} else if utils.TypeOf(searchQuery["_source"]) == "bool" && searchQuery["_source"] == false {
+		searchQuery["_source"] = cSource
+	} else {
+		searchQuery["_source"] = true
 	}
 
 	// child 조회
@@ -190,6 +236,7 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		panic(e)
 	}
 
+	log.Println("서브 쿼리 조회 결과 갯수: " + childIndices + ", " +strconv.Itoa(len(cResp.Hits.Hits)))
 	refHits, maxScoreMap := getRefSet(*cResp.Hits, childKeyList)
 
 	// parent 결과에 child 결과 inner_hits 조합
@@ -214,10 +261,16 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 			searchHits.TotalHits = &totalHits
 			searchHitInnerHits.Hits = &searchHits
 		}
+
+		// 키 존재 하면 parent innerHit 문서 등록
 		if hit.InnerHits == nil {
+			// 기존 innerHit 미존재
 			hit.InnerHits = make(map[string]*elastic.SearchHitInnerHits)
+			hit.InnerHits["_child"] = &searchHitInnerHits
+		} else {
+			// 기존 innerHit 존재
+			hit.InnerHits["_child"] = &searchHitInnerHits
 		}
-		hit.InnerHits["_child"] = &searchHitInnerHits
 	}
 
 	results = *pResp
@@ -241,15 +294,14 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 }
 
 func getTempQuery(mustQuery, filterQuery string) (tempQuery string){
-	if mustQuery == "<nil>" {
-		mustQuery = "{}"
+	if mustQuery == "<nil>" || mustQuery == "null" {
+		mustQuery = "[]"
 	}
-	if filterQuery == "<nil>" {
-		filterQuery = "{}"
+	if filterQuery == "<nil>" || mustQuery == "null" {
+		filterQuery = "[]"
 	}
 	tempQuery = fmt.Sprintf(`
 		{ 
-			"track_total_hits": true, 
 			"query": { 
  				"bool": {
 					"must": %s,
