@@ -60,7 +60,7 @@ func Join(res http.ResponseWriter, req *http.Request) {
 		response, _ := json.MarshalIndent(results, "", "  ")
 		res.WriteHeader(200)
 		_, _ = res.Write(response)
-	} else if fullQuery[TypeField] != nil && fullQuery[TypeField] == "left" {
+	} else {
 		Left(indices, fullQuery, res, req)
 	}
 
