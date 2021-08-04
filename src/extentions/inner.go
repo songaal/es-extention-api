@@ -181,9 +181,9 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	// inner_hits 추가할 child 조회
 	termsQueryJson, _ = json.Marshal(getTermsQuery(*pResp.Hits, childKeyList, parentKeyList))
 	childQueryJson, _ := json.Marshal(childQuery["query"])
-	//tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
+	tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
 	// parent, child 타입이 text 일 경우 안나오는현상 발생
-	tempQuery = getTempQuery(string(childQueryJson), "null")
+	//tempQuery = getTempQuery(string(childQueryJson), "null")
 	searchQuery = make(map[string]interface{})
 	_ = json.Unmarshal([]byte(tempQuery), &searchQuery)
 	for k, v := range childQuery {
