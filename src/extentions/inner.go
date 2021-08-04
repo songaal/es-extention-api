@@ -179,11 +179,11 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	}
 
 	// inner_hits 추가할 child 조회
-	termsQueryJson, _ = json.Marshal(getTermsQuery(*pResp.Hits, childKeyList, parentKeyList))
+	//termsQueryJson, _ = json.Marshal(getTermsQuery(*pResp.Hits, childKeyList, parentKeyList))
 	childQueryJson, _ := json.Marshal(childQuery["query"])
-	tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
+	//tempQuery = getTempQuery(string(childQueryJson), string(termsQueryJson))
 	// parent, child 타입이 text 일 경우 안나오는현상 발생
-	//tempQuery = getTempQuery(string(childQueryJson), "null")
+	tempQuery = getTempQuery(string(childQueryJson), "null")
 	searchQuery = make(map[string]interface{})
 	_ = json.Unmarshal([]byte(tempQuery), &searchQuery)
 	for k, v := range childQuery {
@@ -237,6 +237,7 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	}
 
 	log.Println("서브 쿼리 조회 결과 갯수: " + childIndices + ", " +strconv.Itoa(len(cResp.Hits.Hits)))
+
 	refHits, maxScoreMap := getRefSet(*cResp.Hits, childKeyList)
 
 	// parent 결과에 child 결과 inner_hits 조합
