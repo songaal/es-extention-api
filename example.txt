@@ -121,12 +121,13 @@ GET /child-index/_search
 
 # left 조인
 # 하나의 필드로 left 조인하는 쿼리 입니다.
-GET /parent-index/_left
+GET /parent-index/_join
 {
   "query": {
     "match_all": {}
   },
   "size": 50,
+  "type": "left",
   "join": {
     "index": "child-index",
     "parent": "ref",
@@ -139,12 +140,13 @@ GET /parent-index/_left
 
 # 두개의 필드로 left 조인하는 쿼리 입니다.
 # * 결과에서 lg모니터, 다나와 모니터는 ref, pk 값이 일치하지 않아 표시되지 않습니다.
-GET /parent-index/_left
+GET /parent-index/_join
 {
   "query": {
     "match_all": {}
   },
   "size": 50,
+  "type": "left",
   "join": {
     "index": "child-index",
     "parent": ["ref", "pk"],

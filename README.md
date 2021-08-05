@@ -2,17 +2,49 @@
 
 ## 소개
 
-엘라스틱서치의 Left Join 기능을 제공합니다.
+엘라스틱서치에서 조인기능을 제공합니다.
 
-es-extention-api를 통해 엘라스틱서치 연결을 하면 /_left 엔드포인트를 사용할 수 있게 됩니다.    
+엘라스틱서치 앞에 ex-extention-api를 사용할 경우, /<index>/_join 엔드포인트를 사용할 수 있습니다.
 
-_search 유사하게 조인 QueryDSL를 작성하게 되면 innerHits에 _child를 포함한 결과를 받을 수 있습니다.
+엘라스틱 문서 검색과 동일하게 QueryDSL 통해 검색하면되며, 조인을 위해선 join 과 type 필드를 작성하면됩니다. 
+
+조인의 추가된 결과는 innerHits 하위에 _child 영역에 포함되게 됩니다.
+
+---
+새로운 inner 조인기능이 추가되었습니다.
+
+inner 조인은 parent, child 조건에 동일한 결과의 집합합니다.  
+
+left 조인과 inner 조인은 type 필드로 구분됩니다. 
+
+조인 구조
+```text
+{
+    query: {
+        ... (생략)
+    }
+    type: "inner" or "left" 
+    join: { 
+      index: "child-index",
+      host: "http://dev-elasticsearch:9200",
+      username: "elastic",
+      password: "secret",
+      parent: "parent-key",
+      child:  "child-key",
+      ... (생략)
+     }
+    ... (생략)
+}
+```
+* inner 조인은 여러개의 join 을 미지원.
+
+---
 
 자세한 내용은 다나와 기술블로그를 확인해주세요.
 https://danawalab.github.io/elastic/2021/01/06/elasticsearch-left-join-proxy.html
 
 ```
-GET /parent-index/_left
+GET /parent-index/_join
 {
   "query": {
     "match": {
@@ -21,6 +53,7 @@ GET /parent-index/_left
   },
   "from": 0,
   "size": 10000,
+  "type": "left",
   "join": {
     "index": "child-index",
     "parent": "bundleKey",
@@ -44,11 +77,6 @@ OUTPUT
     "max_score": 1,
     "hits": [
       {
-        "_score": 1,
-        "_index": "parent-index",
-        "_type": "_doc",
-        "_id": "3664488",
-        "_seq_no": null,
         "_primary_term": null,
         "_source": {
           "priceType": "",
@@ -89,10 +117,14 @@ OUTPUT
 
 | 필드명 | 설명 |
 | --- | --- |
+|type | "left", "inner"를 지원합니다. |
 |index | child 인덱스명 |
 |parent | Parent 필드명 |
 |child | Child 필드명 |
 |query | Child 검색 쿼리 |
+|host | Child 검색할 엘라스틱 호스트정보 (ex: http://elasticsearch:9200,...) |
+|username | Child 검색할 엘라스틱 사용자명 |
+|password | Child 검색할 엘라스틱 비밀번호 |
 
 
 ## es-extention-api 실행방법
