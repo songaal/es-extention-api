@@ -6,6 +6,7 @@ import (
 	"github.com/olivere/elastic/v7"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -16,6 +17,8 @@ var (
 	esUser        = utils.GetArg("es.user", "", os.Args)
 	esPass        = utils.GetArg("es.password", "", os.Args)
 	DefaultClient = elastic.Client{}
+	termsMaxCountStr = utils.GetArg("termsMaxCount", "9999999", os.Args)
+	TermsMaxCount = 9999999
 )
 
 func Initialize() {
@@ -27,6 +30,7 @@ func Initialize() {
 	} else {
 		DefaultClient = tmpEsClient
 	}
+	TermsMaxCount, _ = strconv.Atoi(termsMaxCountStr)
 }
 
 func GetClient(host, user, password string) (client elastic.Client, err error) {

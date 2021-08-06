@@ -334,7 +334,7 @@ func getTermsQuery(hits elastic.SearchHits, keyFields, valueFields []string) (te
 			} else if utils.Contains(tmpFields[pKey], val) == false {
 				// 새로운 값을 추가한다.
 				tmpFields[pKey] = append(tmpFields[pKey], val)
-				if len(tmpFields[pKey]) > 65536 {
+				if len(tmpFields[pKey]) > TermsMaxCount {
 					panic(fmt.Sprintf("terms 최대 갯수를 초과함. key: %s  value: %s", pKey, tmpFields[pKey]))
 				}
 			}
