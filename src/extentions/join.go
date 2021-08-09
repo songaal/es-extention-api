@@ -13,19 +13,16 @@ import (
 )
 
 const (
-	//InnerJoinField = "inner"
-	//LeftJoinField  = "left"
-
 	TypeField = "type"
 
 	IndicesField = "index"
 	ParentFields = "parent"
 	ChildFields = "child"
 
-	ChildHostField = "host"
-	ChildUsernameField = "username"
-	ChildPasswordField = "password"
-	usage = "{}"
+	HostField     = "host"
+	UsernameField = "username"
+	PasswordField = "password"
+	usage         = "{}"
 )
 
 func Join(res http.ResponseWriter, req *http.Request) {
@@ -45,7 +42,7 @@ func Join(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Request Body 파싱
-	fullQuery, e := parseBody(req.Body)
+	fullQuery, e := ParseBody(req.Body)
 	if e != nil {
 		panic(e)
 	}
@@ -70,7 +67,7 @@ func Join(res http.ResponseWriter, req *http.Request) {
 /**
  * 요청받은 데이터를 객체로 변환하는 함수
  */
-func parseBody(body io.ReadCloser) (query map[string]interface{}, err error) {
+func ParseBody(body io.ReadCloser) (query map[string]interface{}, err error) {
 	read, _ := ioutil.ReadAll(body)
 	err = json.Unmarshal(read, &query)
 	return

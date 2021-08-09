@@ -40,12 +40,20 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	childIndices  := ""
 	parentFields := ""
 	childFields :=  ""
-	if childQueryEntity[ChildHostField]     != nil { host = fmt.Sprintf("%v", childQueryEntity[ChildHostField]) }
-	if childQueryEntity[ChildUsernameField] != nil { username = fmt.Sprintf("%v", childQueryEntity[ChildUsernameField]) }
-	if childQueryEntity[ChildPasswordField] != nil { password = fmt.Sprintf("%v", childQueryEntity[ChildPasswordField]) }
-	if childQueryEntity[IndicesField]       != nil { childIndices = fmt.Sprintf("%v", childQueryEntity[IndicesField]) }
-	if childQueryEntity[ParentFields]       != nil { parentFields = fmt.Sprintf("%v", childQueryEntity[ParentFields]) }
-	if childQueryEntity[ChildFields]        != nil { childFields = fmt.Sprintf("%v", childQueryEntity[ChildFields]) }
+	parentHost := ""
+	parentUsername := ""
+	parentPassword := ""
+	if childQueryEntity[HostField]     != nil { host = fmt.Sprintf("%v", childQueryEntity[HostField]) }
+	if childQueryEntity[UsernameField] != nil { username = fmt.Sprintf("%v", childQueryEntity[UsernameField]) }
+	if childQueryEntity[PasswordField] != nil { password = fmt.Sprintf("%v", childQueryEntity[PasswordField]) }
+	if childQueryEntity[IndicesField]  != nil { childIndices = fmt.Sprintf("%v", childQueryEntity[IndicesField]) }
+	if childQueryEntity[ParentFields]  != nil { parentFields = fmt.Sprintf("%v", childQueryEntity[ParentFields]) }
+	if childQueryEntity[ChildFields]   != nil { childFields = fmt.Sprintf("%v", childQueryEntity[ChildFields]) }
+
+	// parent host
+	if fullQueryEntity[HostField]      != nil { parentHost = fmt.Sprintf("%v", fullQueryEntity[HostField]) }
+	if fullQueryEntity[UsernameField]  != nil { parentUsername = fmt.Sprintf("%v", fullQueryEntity[UsernameField]) }
+	if fullQueryEntity[PasswordField]  != nil { parentPassword = fmt.Sprintf("%v", fullQueryEntity[PasswordField]) }
 
 	// 필수값 체크
 	if childIndices == "" {
@@ -61,6 +69,10 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 
 	// parent, child ES 클라이언트 생성
 	pClient := DefaultClient
+	if parentHost != "" {
+		log.Println("parent ES >>", parentHost, parentUsername, parentPassword)
+		pClient, _ = GetClient(parentHost, parentUsername, parentPassword)
+	}
 	cClient := DefaultClient
 	if host != "" {
 		log.Println("child ES >>", host, username, password)
@@ -72,7 +84,10 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	childQuery := make(map[string]interface{})
 	for k, v := range fullQueryEntity {
 		if k != "join" &&
-			k != TypeField {
+			k != TypeField &&
+			k != HostField &&
+			k != UsernameField &&
+			k != PasswordField {
 			parentQuery[k] = v
 		}
 	}
@@ -80,9 +95,9 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		if k != ParentFields &&
 			k != ChildFields &&
 			k != IndicesField &&
-			k != ChildHostField &&
-			k != ChildUsernameField &&
-			k != ChildPasswordField &&
+			k != HostField &&
+			k != UsernameField &&
+			k != PasswordField &&
 			k != TypeField {
 			childQuery[k] = v
 		}

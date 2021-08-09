@@ -160,9 +160,20 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 
 	// parent indices 존재 여부
 	//ExistsIndices(parentClient, indices)
+	pChild := DefaultClient
+	if parentQuery[HostField] != nil && parentQuery[HostField] != "" {
+		log.Println("parent", parentQuery[HostField], parentQuery[UsernameField], parentQuery[PasswordField])
+		parentHost     := fmt.Sprintf("%v", parentQuery[HostField])
+		parentUsername := fmt.Sprintf("%v", parentQuery[UsernameField])
+		parentPassword := fmt.Sprintf("%v", parentQuery[PasswordField])
+		pChild, _ = GetClient(parentHost, parentUsername, parentPassword)
+		delete(parentQuery, HostField)
+		delete(parentQuery, UsernameField)
+		delete(parentQuery, PasswordField)
+	}
 
 	// Parent 엘라스틱 서치 조회
-	parentResult, err := DefaultClient.Search().
+	parentResult, err := pChild.Search().
 		Index(indices).
 		Timeout("60s").
 		Source(parentQuery).
