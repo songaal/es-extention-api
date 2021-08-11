@@ -115,18 +115,9 @@ OUTPUT
 
 ### JOIN 필드 설명
 
-#### 상위 레벨
-
 | 필드명 | 설명 |
 | --- | --- |
 |type | "left", "inner"를 지원합니다. |
-|host | parent 검색할 엘라스틱 호스트정보 (ex: http://elasticsearch:9200,...) |
-|username | parent 검색할 엘라스틱 사용자명 |
-|password | parent 검색할 엘라스틱 비밀번호 |
-
-#### 하위 레벨
-| 필드명 | 설명 |
-| --- | --- |
 |index | child 인덱스명 |
 |parent | Parent 필드명 |
 |child | Child 필드명 |
