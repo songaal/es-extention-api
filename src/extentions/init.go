@@ -23,7 +23,9 @@ var (
 
 func Initialize() {
 	log.Println("init.")
-	log.Println("es list:", esUrl, esUser, esPass)
+	log.Println("es list:", esUrl)
+	log.Println("es user:", esUser)
+	log.Println("es pass:", esPass)
 	if tmpEsClient, err := GetClient(esUrl, esUser, esPass); err != nil {
 		log.Println("ES Connection ERROR", err)
 		panic("ES Connection ERROR" + fmt.Sprintln(err))
