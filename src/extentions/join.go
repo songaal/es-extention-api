@@ -54,8 +54,14 @@ func Join(res http.ResponseWriter, req *http.Request) {
 	if fullQuery[TypeField] != nil && fullQuery[TypeField] == "inner" {
 		results := elastic.SearchResult{}
 		results = Inner(indices, fullQuery)
-		response, _ := json.MarshalIndent(results, "", "  ")
 		res.WriteHeader(200)
+		response := make([]byte, 0)
+		if len(results.Hits.Hits) == 0 {
+			zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
+			response = []byte(zero)
+		} else {
+			response, _ = json.MarshalIndent(results, "", "  ")
+		}
 		_, _ = res.Write(response)
 	} else {
 		Left(indices, fullQuery, res, req)
