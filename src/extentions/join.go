@@ -57,7 +57,26 @@ func Join(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(200)
 		response := make([]byte, 0)
 		if len(results.Hits.Hits) == 0 {
-			zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
+			//zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
+			zero := `{
+  "took" : 1,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 1,
+    "successful" : 1,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 0,
+      "relation" : "eq"
+    },
+    "max_score" : null,
+    "hits" : [ ]
+  }
+}
+`
 			response = []byte(zero)
 		} else {
 			response, _ = json.MarshalIndent(results, "", "  ")
