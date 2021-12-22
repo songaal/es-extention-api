@@ -2,6 +2,7 @@ package extentions
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/danawalab/es-extention-api/src/model"
@@ -172,12 +173,11 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 	}
 
 	// Parent 엘라스틱 서치 조회
-	parentResult, err := conditionSearchAll(&pChild, indices, "", "60s", false, parentQuery)
-	//parentResult, err := pChild.Search().
-	//	Index(indices).
-	//	Timeout("60s").
-	//	Source(parentQuery).
-	//	Do(context.TODO())
+	parentResult, err := pChild.Search().
+		Index(indices).
+		Timeout("60s").
+		Source(parentQuery).
+		Do(context.TODO())
 	if err != nil {
 		log.Println(err, parentResult)
 		panic(err)

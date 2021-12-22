@@ -13,6 +13,8 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 )
 
 const (
@@ -33,6 +35,7 @@ func Join(res http.ResponseWriter, req *http.Request) {
 		v := recover()
 		if v != nil {
 			log.Println("error:", v)
+			fmt.Println("error:", v)
 			res.WriteHeader(400)
 			_, _ = res.Write([]byte("{\"error\": \"" + fmt.Sprint(v) + "\"}"))
 		}
@@ -105,13 +108,18 @@ func ParseBody(body io.ReadCloser) (query map[string]interface{}, err error) {
 func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout string, tracTotalHits bool, query map[string]interface{}) (response *elastic.SearchResult, err error) {
 	if utils.Contains(scrollSearchIndices, indices) {
 		// scroll search
-		jsonString, _ := json.Marshal(query)
-		queryObj := elastic.NewRawStringQuery(string(jsonString))
+		st := time.Now().Unix()
+
+		// scroll search size.
+		delete(query, "from")
+		delete(query, "size")
+
 		svc := client.Scroll(indices).
-			Scroll(scrollSearchTimeout).
+			Scroll(scrollSearchKeepAlive).
 			TrackTotalHits(true).
 			Size(10000).
-			Query(queryObj)
+			Body(query)
+
 		if filterPath != "" {
 			svc = svc.FilterPath(filterPath)
 		}
@@ -123,44 +131,48 @@ func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout str
 			log.Println("search error.", err)
 			return
 		}
-		// scrollids search...
-		var scrollIds []string
-		scrollIds = append(scrollIds, response.ScrollId)
-		for {
-			lastScrollId := scrollIds[len(scrollIds) - 1]
-			if lastScrollId == "" || lastScrollId == "nil" {
-				break
-			}
-			tmpResp, e := client.Scroll(indices).
-				ScrollId(lastScrollId).
-				Do(context.TODO())
-			if e != nil {
-				fmt.Println("scroll search 중 에러 발생.", e)
-				log.Println("scroll search 중 에러 발생.", e)
-				break
-			}
-			if tmpResp.ScrollId != "" {
+
+		if len(response.Hits.Hits) <= 10000 {
+			fmt.Println("scroll searching..", response.ScrollId)
+			log.Println("scroll searching..", response.ScrollId)
+			// scrollids search...
+			var scrollIds []string
+			scrollIds = append(scrollIds, response.ScrollId)
+			for {
+				lastScrollId := scrollIds[len(scrollIds) - 1]
+
+				tmpResp, e := client.Scroll(indices).
+					ScrollId(lastScrollId).
+					Scroll(scrollSearchKeepAlive).
+					Do(context.TODO())
+				if e != nil && e.Error() == "EOF" {
+					// 스크롤 서치 마지막
+					// fmt.Println("EOF")
+					break
+				} else if e != nil {
+					fmt.Println("scroll search 중 에러 발생.", e)
+					log.Println("scroll search 중 에러 발생.", e)
+					break
+				}
 				scrollIds = append(scrollIds, tmpResp.ScrollId)
+
+				for _, hit := range tmpResp.Hits.Hits {
+					// hits 안에 hit 추가.
+					response.Hits.Hits = append(response.Hits.Hits, hit)
+				}
+				if response.Hits.MaxScore != nil && tmpResp.Hits.MaxScore != nil {
+					maxScore := math.Max(*response.Hits.MaxScore, *tmpResp.Hits.MaxScore)
+					response.Hits.MaxScore = &maxScore
+				}
 			}
 
-			for _, hit := range tmpResp.Hits.Hits {
-				// hits 안에 hit 추가.
-				response.Hits.Hits = append(response.Hits.Hits, hit)
-			}
-			if response.Hits.MaxScore != nil && tmpResp.Hits.MaxScore != nil {
-				maxScore := math.Max(*response.Hits.MaxScore, *tmpResp.Hits.MaxScore)
-				response.Hits.MaxScore = &maxScore
-			}
-			//if !tracTotalHits {
-			//	response.Hits.TotalHits.Value += tmpResp.Hits.TotalHits.Value
-			//}
+			fmt.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
+			log.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
+			client.ClearScroll(scrollIds...)
 		}
-		fmt.Println("scroll search 완료. id 갯수: ", len(scrollIds), ", 문서 갯수: ", len(response.Hits.Hits), ", totalHits 수:", response.Hits.TotalHits.Value)
-		log.Println("scroll search 완료. id 갯수: ", len(scrollIds), ", 문서 갯수: ", len(response.Hits.Hits), ", totalHits 수:", response.Hits.TotalHits.Value)
 
-		client.ClearScroll(scrollIds...)
-
-		log.Println("scroll searching..", indices, ", size: ", response.Hits.TotalHits.Value)
+		nt := time.Now().Unix()
+		log.Println("쿼리 조회 소요시간 " + strconv.Itoa(int(nt-st)) + "s")
 	} else {
 		// search only
 		svc := client.Search().

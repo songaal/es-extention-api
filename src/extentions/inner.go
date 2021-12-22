@@ -2,6 +2,7 @@ package extentions
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/danawalab/es-extention-api/src/utils"
@@ -180,12 +181,11 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 
 	// parent 조회
 	st2 := time.Now().Unix()
-	pResp, e := conditionSearchAll(&pClient, indices, "", "120s", false, searchQuery)
-	//pResp, e := pClient.Search().
-	//	Index(indices).
-	//	Timeout("120s").
-	//	Source(searchQuery).
-	//	Do(context.TODO())
+	pResp, e := pClient.Search().
+		Index(indices).
+		Timeout("120s").
+		Source(searchQuery).
+		Do(context.TODO())
 	if e != nil {
 		log.Println(e, pResp)
 		panic(e)
