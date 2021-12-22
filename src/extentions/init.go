@@ -19,6 +19,9 @@ var (
 	DefaultClient = elastic.Client{}
 	termsMaxCountStr = utils.GetArg("termsMaxCount", "9999999", os.Args)
 	TermsMaxCount = 9999999
+
+	scrollSearchIndices = strings.Split(utils.GetArg("scroll.indices", "", os.Args), ",")
+	scrollSearchTimeout = utils.GetArg("scroll.timeout", "2m", os.Args)
 )
 
 func Initialize() {

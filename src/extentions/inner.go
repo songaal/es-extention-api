@@ -2,7 +2,6 @@ package extentions
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/danawalab/es-extention-api/src/utils"
@@ -110,12 +109,13 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 	}
 	childQuery["_source"] = true
 	st1 := time.Now().Unix()
-	cResp, e := cClient.Search().
-		Index(childIndices).
-		FilterPath("hits.hits").
-		Timeout("120s").
-		Source(childQuery).
-		Do(context.TODO())
+	cResp, e := conditionSearchAll(&cClient, childIndices, "hits.hits", "120s", true, childQuery)
+	//cResp, e := cClient.Search().
+	//	Index(childIndices).
+	//	FilterPath("hits.hits").
+	//	Timeout("120s").
+	//	Source(childQuery).
+	//	Do(context.TODO())
 	if e != nil {
 		log.Println(e, cResp)
 		panic(e)
@@ -180,11 +180,12 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 
 	// parent 조회
 	st2 := time.Now().Unix()
-	pResp, e := pClient.Search().
-		Index(indices).
-		Timeout("120s").
-		Source(searchQuery).
-		Do(context.TODO())
+	pResp, e := conditionSearchAll(&pClient, indices, "", "120s", false, searchQuery)
+	//pResp, e := pClient.Search().
+	//	Index(indices).
+	//	Timeout("120s").
+	//	Source(searchQuery).
+	//	Do(context.TODO())
 	if e != nil {
 		log.Println(e, pResp)
 		panic(e)
@@ -248,11 +249,12 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 
 	// child 조회
 	st3 := time.Now().Unix()
-	cResp, e = cClient.Search().
-		Index(childIndices).
-		Timeout("120s").
-		Source(searchQuery).
-		Do(context.TODO())
+	cResp, e = conditionSearchAll(&cClient, childIndices, "", "120s", false, searchQuery)
+	//cResp, e = cClient.Search().
+	//	Index(childIndices).
+	//	Timeout("120s").
+	//	Source(searchQuery).
+	//	Do(context.TODO())
 	if e != nil {
 		log.Println(e, cResp)
 		panic(e)
