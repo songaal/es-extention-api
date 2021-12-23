@@ -1,15 +1,20 @@
 package extentions
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/danawalab/es-extention-api/src/utils"
 	"github.com/gorilla/mux"
 	"github.com/olivere/elastic/v7"
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 )
 
 const (
@@ -30,6 +35,7 @@ func Join(res http.ResponseWriter, req *http.Request) {
 		v := recover()
 		if v != nil {
 			log.Println("error:", v)
+			fmt.Println("error:", v)
 			res.WriteHeader(400)
 			_, _ = res.Write([]byte("{\"error\": \"" + fmt.Sprint(v) + "\"}"))
 		}
@@ -95,5 +101,93 @@ func Join(res http.ResponseWriter, req *http.Request) {
 func ParseBody(body io.ReadCloser) (query map[string]interface{}, err error) {
 	read, _ := ioutil.ReadAll(body)
 	err = json.Unmarshal(read, &query)
+	return
+}
+
+
+func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout string, tracTotalHits bool, query map[string]interface{}) (response *elastic.SearchResult, err error) {
+	if utils.Contains(scrollSearchIndices, indices) {
+		// scroll search
+		st := time.Now().Unix()
+
+		// scroll search size.
+		delete(query, "from")
+		delete(query, "size")
+
+		svc := client.Scroll(indices).
+			Scroll(scrollSearchKeepAlive).
+			TrackTotalHits(true).
+			Size(10000).
+			Body(query)
+
+		if filterPath != "" {
+			svc = svc.FilterPath(filterPath)
+		}
+		if timeout != "" {
+			svc = svc.SearchSource(elastic.NewSearchSource().Timeout(timeout))
+		}
+		response, err = svc.Do(context.TODO())
+		if err != nil {
+			log.Println("search error.", err)
+			return
+		}
+
+		var scrollIds []string
+		scrollIds = append(scrollIds, response.ScrollId)
+
+		if len(response.Hits.Hits) >= 10000 {
+			fmt.Println("scroll searching..", response.ScrollId)
+			log.Println("scroll searching..", response.ScrollId)
+			// scrollids search...
+
+			for {
+				lastScrollId := scrollIds[len(scrollIds) - 1]
+
+				tmpResp, e := client.Scroll(indices).
+					ScrollId(lastScrollId).
+					Scroll(scrollSearchKeepAlive).
+					Do(context.TODO())
+				if e != nil && e.Error() == "EOF" {
+					// 스크롤 서치 마지막
+					// fmt.Println("EOF")
+					break
+				} else if e != nil {
+					fmt.Println("scroll search 중 에러 발생.", e)
+					log.Println("scroll search 중 에러 발생.", e)
+					break
+				}
+				scrollIds = append(scrollIds, tmpResp.ScrollId)
+
+				for _, hit := range tmpResp.Hits.Hits {
+					// hits 안에 hit 추가.
+					response.Hits.Hits = append(response.Hits.Hits, hit)
+				}
+				if response.Hits.MaxScore != nil && tmpResp.Hits.MaxScore != nil {
+					maxScore := math.Max(*response.Hits.MaxScore, *tmpResp.Hits.MaxScore)
+					response.Hits.MaxScore = &maxScore
+				}
+			}
+
+			fmt.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
+			log.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
+		}
+		client.ClearScroll(scrollIds...)
+		nt := time.Now().Unix()
+		log.Println("쿼리 조회 소요시간 " + strconv.Itoa(int(nt-st)) + "s")
+	} else {
+		// search only
+		svc := client.Search().
+			Index(indices).
+			Source(query).
+			TrackTotalHits(tracTotalHits)
+		if timeout != "" {
+			svc = svc.Timeout(timeout)
+		}
+		if filterPath != "" {
+			svc = svc.FilterPath(filterPath)
+		}
+		response, err = svc.Do(context.TODO())
+	}
+
 	return
 }
