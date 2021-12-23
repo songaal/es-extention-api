@@ -132,12 +132,14 @@ func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout str
 			return
 		}
 
-		if len(response.Hits.Hits) <= 10000 {
+		var scrollIds []string
+		scrollIds = append(scrollIds, response.ScrollId)
+
+		if len(response.Hits.Hits) >= 10000 {
 			fmt.Println("scroll searching..", response.ScrollId)
 			log.Println("scroll searching..", response.ScrollId)
 			// scrollids search...
-			var scrollIds []string
-			scrollIds = append(scrollIds, response.ScrollId)
+
 			for {
 				lastScrollId := scrollIds[len(scrollIds) - 1]
 
@@ -168,9 +170,8 @@ func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout str
 
 			fmt.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
 			log.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
-			client.ClearScroll(scrollIds...)
 		}
-
+		client.ClearScroll(scrollIds...)
 		nt := time.Now().Unix()
 		log.Println("쿼리 조회 소요시간 " + strconv.Itoa(int(nt-st)) + "s")
 	} else {

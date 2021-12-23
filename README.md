@@ -125,7 +125,8 @@ OUTPUT
 |host | Child 검색할 엘라스틱 호스트정보 (ex: http://elasticsearch:9200,...) |
 |username | Child 검색할 엘라스틱 사용자명 |
 |password | Child 검색할 엘라스틱 비밀번호 |
-
+|scroll.indices | Child 조회시 scroll 방식 조회할 인덱스를 콤마구분하여 입력 (ex: product, goods) |
+|scroll.keepalive | scroll keepalive (기본값: 5m) |
 
 ## es-extention-api 실행방법
 
