@@ -125,8 +125,6 @@ OUTPUT
 |host | Child 검색할 엘라스틱 호스트정보 (ex: http://elasticsearch:9200,...) |
 |username | Child 검색할 엘라스틱 사용자명 |
 |password | Child 검색할 엘라스틱 비밀번호 |
-|scroll.indices | Child 조회시 scroll 방식 조회할 인덱스를 콤마구분하여 입력 (ex: product, goods) |
-|scroll.keepalive | scroll keepalive (기본값: 5m) |
 
 ## es-extention-api 실행방법
 
@@ -138,12 +136,14 @@ OUTPUT
 |es.urls|http://elasticsearch:9200|엘라스틱서치 URL ,(콤마) 구분하여 입력|
 |es.user|""|엘라스틱서치 사용자명|
 |es.password|""|엘라스틱서치 비밀번호|
+|scroll.indices | Child 조회시 scroll 방식 조회할 인덱스를 콤마구분하여 입력 (ex: product, goods) |
+|scroll.keepalive | scroll keepalive (기본값: 5m) |
 
 
 ### 실행 명령어
 아래 명령어로 서버를 실행하 후 curl localhost:9000/_cat/nodes 요청시 정상적으로 ES 결과를 받는지 확인합니다. 
  ```
-./application port=9000 es.urls=http://elasticsearch:9200 es.user=elastic es.password=z1p87tXaR8gggSqPh8x 
+./application port=9000 es.urls=http://elasticsearch:9200 es.user=elastic es.password=z1p87tXaR8gggSqPh8x scroll.indices=product,goods 
 ```
 
 
