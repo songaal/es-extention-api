@@ -137,7 +137,7 @@ OUTPUT
 |es.user|""|엘라스틱서치 사용자명|
 |es.password|""|엘라스틱서치 비밀번호|
 |scroll.indices | "" |Child 조회시 scroll 방식 조회할 인덱스를 콤마구분하여 입력 (ex: product, goods)|
-|scroll.keepalive | 5m | scroll keepalive (기본값: ) |
+|scroll.keepalive | 5m | scroll keepalive |
 
 
 ### 실행 명령어
