@@ -146,7 +146,8 @@ OUTPUT
 ./application port=9000 es.urls=http://elasticsearch:9200 es.user=elastic es.password=z1p87tXaR8gggSqPh8x scroll.indices=product,goods 
 ```
 
-
+## 버전
+lastest: v1.0.0
 
 
  
