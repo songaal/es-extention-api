@@ -332,11 +332,12 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 		printJson, _ := json.Marshal(originJoinList)
 		log.Println(string(printJson))
 
-		childResult, err := childClient.Search().
-			Index(childElement.Index).
-			Timeout("60s").
-			Source(originJoinList[index]).
-			Do(context.TODO())
+		childResult, err := conditionSearchAll(&childClient, childElement.Index, "", "60s", false, originJoinList[index])
+		//childResult, err := childClient.Search().
+		//	Index(childElement.Index).
+		//	Timeout("60s").
+		//	Source(originJoinList[index]).
+		//	Do(context.TODO())
 		if err != nil {
 			fmt.Println(err, childResult)
 			panic(err)
@@ -360,7 +361,7 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 			refKey := tmpKeyBuf.String()
 			childResults[refKey] = append(childResults[refKey], child)
 
-			if maxScoreMap[refKey] < *child.Score {
+			if child.Score != nil && maxScoreMap[refKey] < *child.Score {
 				maxScoreMap[refKey] = *child.Score
 			}
 		}

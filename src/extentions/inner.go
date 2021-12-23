@@ -109,19 +109,20 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 		childQuery["size"] = 10000
 	}
 	childQuery["_source"] = true
-	st1 := time.Now().Unix()
-	cResp, e := cClient.Search().
-		Index(childIndices).
-		FilterPath("hits.hits").
-		Timeout("120s").
-		Source(childQuery).
-		Do(context.TODO())
+	//st1 := time.Now().Unix()
+	cResp, e := conditionSearchAll(&cClient, childIndices, "hits.hits", "120s", true, childQuery)
+	//cResp, e := cClient.Search().
+	//	Index(childIndices).
+	//	FilterPath("hits.hits").
+	//	Timeout("120s").
+	//	Source(childQuery).
+	//	Do(context.TODO())
 	if e != nil {
 		log.Println(e, cResp)
 		panic(e)
 	}
-	nt1 := time.Now().Unix()
-	log.Println("키 조회 소요시간 " + strconv.Itoa(int(nt1-st1)) + "s")
+	//nt1 := time.Now().Unix()
+	//log.Println("조회 소요시간 " + strconv.Itoa(int(nt1-st1)) + "s")
 
 	if len(cResp.Hits.Hits) == 0 {
 		zero := `{"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}`
@@ -248,11 +249,12 @@ func Inner(indices string, fullQueryEntity map[string]interface{}) (results elas
 
 	// child 조회
 	st3 := time.Now().Unix()
-	cResp, e = cClient.Search().
-		Index(childIndices).
-		Timeout("120s").
-		Source(searchQuery).
-		Do(context.TODO())
+	cResp, e = conditionSearchAll(&cClient, childIndices, "", "120s", false, searchQuery)
+	//cResp, e = cClient.Search().
+	//	Index(childIndices).
+	//	Timeout("120s").
+	//	Source(searchQuery).
+	//	Do(context.TODO())
 	if e != nil {
 		log.Println(e, cResp)
 		panic(e)
