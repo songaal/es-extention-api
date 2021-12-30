@@ -1,0 +1,13 @@
+FROM golang:1.16.5
+
+ENV port 9000
+ENV es_urls http://elasticsearch:9200
+ENV go_env production
+ENV es_user 
+ENV es_password 
+ENV scroll_indices 
+ENV scroll_keepalive 5m
+
+COPY dist/application application
+
+CMD ./application port=$port es.urls=$es_urls go.env=$go_env es.user=$es_user es.password=$es_password scroll.indices=$scroll_indices scroll.keepalive=$scroll_keepalive
