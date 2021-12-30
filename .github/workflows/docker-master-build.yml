@@ -41,6 +41,9 @@ jobs:
       with:
         go-version: 1.16.5
 
+#     mkdir 
+    - run: mkdir dist
+
 #     고 빌드
     - name: build
       run: go build -o dist/application cmd/es-extention-api/main.go
@@ -65,4 +68,4 @@ jobs:
         registry: ${{ env.CONTAINER_REGISTRY }}
         dockerfile: ${{ env.DOCKER_FILE }}
         image: ${{ env.PROJECT_NAME }}
-        tags: ${{ env.tags }}
+        tags: ${{ github.event.inputs.tags }}
