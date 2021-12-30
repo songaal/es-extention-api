@@ -8,6 +8,6 @@ ENV es_password
 ENV scroll_indices 
 ENV scroll_keepalive 5m
 
-COPY dist/application application
+COPY dist .
 
-CMD ./application port=$port es.urls=$es_urls go.env=$go_env es.user=$es_user es.password=$es_password scroll.indices=$scroll_indices scroll.keepalive=$scroll_keepalive
+CMD dist/application port=$port es.urls=$es_urls go.env=$go_env es.user=$es_user es.password=$es_password scroll.indices=$scroll_indices scroll.keepalive=$scroll_keepalive
