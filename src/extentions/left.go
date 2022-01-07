@@ -338,7 +338,7 @@ func Left(indices string, leftRequest map[string]interface{}, res http.ResponseW
 		//	Timeout("60s").
 		//	Source(originJoinList[index]).
 		//	Do(context.TODO())
-		if err != nil {
+		if err != nil && err.Error() != "EOF" {
 			fmt.Println(err, childResult)
 			panic(err)
 			return
