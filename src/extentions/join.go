@@ -22,7 +22,7 @@ const (
 
 	IndicesField = "index"
 	ParentFields = "parent"
-	ChildFields = "child"
+	ChildFields  = "child"
 
 	HostField     = "host"
 	UsernameField = "username"
@@ -104,7 +104,6 @@ func ParseBody(body io.ReadCloser) (query map[string]interface{}, err error) {
 	return
 }
 
-
 func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout string, tracTotalHits bool, query map[string]interface{}) (response *elastic.SearchResult, err error) {
 	if utils.Contains(scrollSearchIndices, indices) {
 		// scroll search
@@ -114,11 +113,17 @@ func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout str
 		delete(query, "from")
 		delete(query, "size")
 
-		svc := client.Scroll(indices).
-			Scroll(scrollSearchKeepAlive).
-			TrackTotalHits(true).
-			Size(10000).
-			Body(query)
+		svc := client.Search().
+			Index(indices).
+			Source(query).
+			TrackTotalHits(tracTotalHits).
+			Size(10000)
+
+		//svc := client.Scroll(indices).
+		//	Scroll(scrollSearchKeepAlive).
+		//	TrackTotalHits(true).
+		//	Size(10000).
+		//	Body(query)
 
 		if filterPath != "" {
 			svc = svc.FilterPath(filterPath)
@@ -132,16 +137,34 @@ func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout str
 			return
 		}
 
-		var scrollIds []string
-		scrollIds = append(scrollIds, response.ScrollId)
-
 		if len(response.Hits.Hits) >= 10000 {
+			var scrollIds []string
+			scrollIds = append(scrollIds, response.ScrollId)
+
+			scrollSvc := client.Scroll(indices).
+				Scroll(scrollSearchKeepAlive).
+				TrackTotalHits(true).
+				Size(10000).
+				Body(query)
+
+			if filterPath != "" {
+				scrollSvc = scrollSvc.FilterPath(filterPath)
+			}
+			if timeout != "" {
+				scrollSvc = scrollSvc.SearchSource(elastic.NewSearchSource().Timeout(timeout))
+			}
+			response, err = scrollSvc.Do(context.TODO())
+			if err != nil {
+				log.Println("search error.", err)
+				return
+			}
+
 			fmt.Println("scroll searching..", response.ScrollId)
 			log.Println("scroll searching..", response.ScrollId)
 			// scrollids search...
 
 			for {
-				lastScrollId := scrollIds[len(scrollIds) - 1]
+				lastScrollId := scrollIds[len(scrollIds)-1]
 
 				tmpResp, e := client.Scroll(indices).
 					ScrollId(lastScrollId).
@@ -170,8 +193,9 @@ func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout str
 
 			fmt.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
 			log.Println("scroll search 완료. 요청 횟수: ", len(scrollIds), ", 총 문서 갯수: ", len(response.Hits.Hits))
+
+			client.ClearScroll(scrollIds...)
 		}
-		client.ClearScroll(scrollIds...)
 		nt := time.Now().Unix()
 		log.Println("쿼리 조회 소요시간 " + strconv.Itoa(int(nt-st)) + "s")
 	} else {
