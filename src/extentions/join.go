@@ -109,9 +109,9 @@ func conditionSearchAll(client *elastic.Client, indices, filterPath, timeout str
 		// scroll search
 		st := time.Now().Unix()
 
-		// scroll search size.
-		delete(query, "from")
-		delete(query, "size")
+		//// scroll search size.
+		//delete(query, "from")
+		//delete(query, "size")
 
 		svc := client.Search().
 			Index(indices).
